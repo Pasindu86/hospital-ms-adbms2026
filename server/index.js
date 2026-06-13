@@ -3,6 +3,7 @@ const cors = require('cors')
 const dotenv = require('dotenv')
 const oracledb = require('oracledb')
 const path = require('path')
+const authRoutes = require('./routes/auth')
 
 dotenv.config({ path: '.env.local' })
 
@@ -33,6 +34,8 @@ app.use(express.json())
 app.get('/api/health', (req, res) => {
   res.json({ ok: true })
 })
+
+app.use('/api/auth', authRoutes)
 
 app.get('/api/users', async (req, res) => {
   let connection
