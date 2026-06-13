@@ -2,6 +2,7 @@ const express = require('express')
 const cors = require('cors')
 const dotenv = require('dotenv')
 const oracledb = require('oracledb')
+const path = require('path')
 
 dotenv.config({ path: '.env.local' })
 
@@ -9,8 +10,14 @@ const {
   DB_USER,
   DB_PASSWORD,
   DB_CONNECT_STRING,
+  WALLET_DIR,
+  WALLET_PASSWORD,
   PORT = 5000,
 } = process.env
+
+if (WALLET_DIR) {
+  process.env.TNS_ADMIN = path.resolve(__dirname, WALLET_DIR)
+}
 
 if (!DB_USER || !DB_PASSWORD || !DB_CONNECT_STRING) {
   console.error('Missing DB config. Check server/.env')
@@ -86,14 +93,23 @@ app.post('/api/users', async (req, res) => {
 
 async function start() {
   try {
-    await oracledb.createPool({
+    const poolConfig = {
       user: DB_USER,
       password: DB_PASSWORD,
       connectString: DB_CONNECT_STRING,
       poolMin: 1,
       poolMax: 5,
       poolIncrement: 1,
-    })
+    };
+    
+    if (WALLET_DIR) {
+      poolConfig.walletLocation = process.env.TNS_ADMIN;
+    }
+    if (WALLET_PASSWORD) {
+      poolConfig.walletPassword = WALLET_PASSWORD;
+    }
+
+    await oracledb.createPool(poolConfig)
 
     app.listen(Number(PORT), () => {
       console.log(`Server listening on http://localhost:${PORT}`)
