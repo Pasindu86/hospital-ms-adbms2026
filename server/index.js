@@ -4,7 +4,6 @@ const dotenv = require('dotenv')
 const oracledb = require('oracledb')
 const path = require('path')
 const authRoutes = require('./routes/auth')
-const patientRoutes = require('./routes/patients')
 
 dotenv.config({ path: '.env.local' })
 
@@ -38,7 +37,6 @@ app.get('/api/health', (req, res) => {
 })
 
 app.use('/api/auth', authRoutes)
-app.use('/api/patients', patientRoutes)
 
 app.get('/api/users', async (req, res) => {
   let connection
@@ -107,7 +105,7 @@ async function start() {
       poolMax: 5,
       poolIncrement: 1,
     };
-    
+
     if (WALLET_DIR) {
       poolConfig.walletLocation = process.env.TNS_ADMIN;
     }
