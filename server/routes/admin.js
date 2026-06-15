@@ -25,22 +25,6 @@ const verifyAdmin = (req, res, next) => {
     } catch (error) {
         res.status(401).json({ error: 'Invalid or expired token' });
     }
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'No token provided' });
-    }
-
-    try {
-        const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
-        if (decoded.role !== 'admin') {
-            return res.status(403).json({ error: 'Admin access required' });
-        }
-        req.user = decoded;
-        next();
-    } catch (error) {
-        res.status(401).json({ error: 'Invalid or expired token' });
-    }
 };
 
 router.get('/nurses', verifyAdmin, async (req, res) => {
@@ -63,40 +47,34 @@ router.get('/nurses', verifyAdmin, async (req, res) => {
 
 router.post('/register-doctor', verifyAdmin, async (req, res) => {
     const {
-        staffId, fullName, email, password, role,
-        const {
-            fullName, email, password, role,
-            mobileNumber, address, licenseNumber, specialistArea, nurses
-        } = req.body;
+        fullName, email, password, role,
+        mobileNumber, address, licenseNumber, specialistArea, nurses
+    } = req.body;
 
     if (role !== 'doctor') {
         return res.status(400).json({ error: 'Invalid role for this endpoint' });
     }
 
-    if (!staffId || !fullName || !password) {
-        if (!fullName || !password) {
-            return res.status(400).json({ error: 'Missing required fields' });
-        }
+    if (!fullName || !password) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
 
-        let connection;
-        try {
-            const hash = await bcrypt.hash(password, 10);
-            connection = await oracledb.getConnection();
+    let connection;
+    try {
+        const hash = await bcrypt.hash(password, 10);
+        connection = await oracledb.getConnection();
 
-            const nurseIdsCsv = (nurses || []).join(',');
+        const nurseIdsCsv = (nurses || []).join(',');
 
-
-            const nurseIdsCsv = (nurses || []).join(',');
-
-            // Auto-generate STAFF_ID for doctor
-            const maxIdRes = await connection.execute(
-                `SELECT NVL(MAX(TO_NUMBER(REGEXP_REPLACE(staff_id, '[^0-9]', ''))), 0) + 1 AS next_id 
+        // Auto-generate STAFF_ID for doctor
+        const maxIdRes = await connection.execute(
+            `SELECT NVL(MAX(TO_NUMBER(REGEXP_REPLACE(staff_id, '[^0-9]', ''))), 0) + 1 AS next_id 
              FROM user_auth WHERE role = 'doctor'`
-            );
-            const generatedStaffId = 'D' + String(maxIdRes.rows[0].NEXT_ID || 1).padStart(3, '0');
+        );
+        const generatedStaffId = 'D' + String(maxIdRes.rows[0].NEXT_ID || 1).padStart(3, '0');
 
-            const result = await connection.execute(
-                `BEGIN
+        const result = await connection.execute(
+            `BEGIN
                 PKG_ADMIN_OPS.REGISTER_DOCTOR(
                     p_staff_id => :staffId,
                     p_full_name => :fullName,
@@ -110,74 +88,66 @@ router.post('/register-doctor', verifyAdmin, async (req, res) => {
                     p_user_id => :outUserId
                 );
             END;`,
-                {
-                    staffId: staffId,
-                    staffId: generatedStaffId,
-                    fullName: fullName,
-                    email: email || '',
-                    passwordHash: hash,
-                    licenseNumber: licenseNumber || '',
-                    address: address || '',
-                    mobileNumber: mobileNumber || '',
-                    specialistArea: specialistArea || '',
-                    nurseIdsCsv: nurseIdsCsv,
-                    outUserId: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
-                },
-                { autoCommit: true }
-            );
+            {
+                staffId: generatedStaffId,
+                fullName: fullName,
+                email: email || '',
+                passwordHash: hash,
+                licenseNumber: licenseNumber || '',
+                address: address || '',
+                mobileNumber: mobileNumber || '',
+                specialistArea: specialistArea || '',
+                nurseIdsCsv: nurseIdsCsv,
+                outUserId: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
+            },
+            { autoCommit: true }
+        );
 
-            res.status(201).json({
-                message: 'Doctor registered successfully',
-                userId: result.outBinds.outUserId
         res.status(201).json({
-                    message: 'Doctor registered successfully',
-                    userId: result.outBinds.outUserId
-                });
-
-            } catch (error) {
-                console.error('POST /api/admin/register-doctor failed', error);
-                if (error.errorNum === 1 || error.message.includes('ORA-00001')) {
-                    return res.status(409).json({ error: 'Staff ID or Email already exists' });
-                }
-                res.status(500).json({ error: 'Server error during registration' });
-            } finally {
-                if (connection) {
-                    try { await connection.close(); } catch (e) { /* ignore */ }
-                }
-            }
+            message: 'Doctor registered successfully',
+            userId: result.outBinds.outUserId
         });
+    } catch (error) {
+        console.error('POST /api/admin/register-doctor failed', error);
+        if (error.errorNum === 1 || error.message.includes('ORA-00001')) {
+            return res.status(409).json({ error: 'Staff ID or Email already exists' });
+        }
+        res.status(500).json({ error: 'Server error during registration' });
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { /* ignore */ }
+        }
+    }
+});
 
 router.post('/register-nurse', verifyAdmin, async (req, res) => {
     const {
-        staffId, fullName, email, password, role,
-        const {
-            fullName, email, password, role,
-            mobileNumber, address, licenseNumber, allocatedWard
-        } = req.body;
+        fullName, email, password, role,
+        mobileNumber, address, licenseNumber, allocatedWard
+    } = req.body;
 
     if (role !== 'nurse') {
         return res.status(400).json({ error: 'Invalid role for this endpoint' });
     }
 
-    if (!staffId || !fullName || !password) {
-        if (!fullName || !password) {
-            return res.status(400).json({ error: 'Missing required fields' });
-        }
+    if (!fullName || !password) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
 
-        let connection;
-        try {
-            const hash = await bcrypt.hash(password, 10);
-            connection = await oracledb.getConnection();
+    let connection;
+    try {
+        const hash = await bcrypt.hash(password, 10);
+        connection = await oracledb.getConnection();
 
-            // Auto-generate STAFF_ID for nurse
-            const maxIdRes = await connection.execute(
-                `SELECT NVL(MAX(TO_NUMBER(REGEXP_REPLACE(staff_id, '[^0-9]', ''))), 0) + 1 AS next_id 
+        // Auto-generate STAFF_ID for nurse
+        const maxIdRes = await connection.execute(
+            `SELECT NVL(MAX(TO_NUMBER(REGEXP_REPLACE(staff_id, '[^0-9]', ''))), 0) + 1 AS next_id 
              FROM user_auth WHERE role = 'nurse'`
-            );
-            const generatedStaffId = 'N' + String(maxIdRes.rows[0].NEXT_ID || 1).padStart(3, '0');
+        );
+        const generatedStaffId = 'N' + String(maxIdRes.rows[0].NEXT_ID || 1).padStart(3, '0');
 
-            const result = await connection.execute(
-                `DECLARE
+        const result = await connection.execute(
+            `DECLARE
                 v_user_id NUMBER;
             BEGIN
                 INSERT INTO user_auth (staff_id, full_name, email, password_hash, role, is_active)
@@ -189,41 +159,36 @@ router.post('/register-nurse', verifyAdmin, async (req, res) => {
 
                 :outUserId := v_user_id;
             END;`,
-                {
-                    staffId: staffId,
-                    staffId: generatedStaffId,
-                    fullName: fullName,
-                    email: email || '',
-                    passwordHash: hash,
-                    licenseNumber: licenseNumber || '',
-                    address: address || '',
-                    mobileNumber: mobileNumber || '',
-                    allocatedWard: allocatedWard || '',
-                    outUserId: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
-                },
-                { autoCommit: true }
-            );
+            {
+                staffId: generatedStaffId,
+                fullName: fullName,
+                email: email || '',
+                passwordHash: hash,
+                licenseNumber: licenseNumber || '',
+                address: address || '',
+                mobileNumber: mobileNumber || '',
+                allocatedWard: allocatedWard || '',
+                outUserId: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
+            },
+            { autoCommit: true }
+        );
 
-            res.status(201).json({
-                message: 'Nurse registered successfully',
-                userId: result.outBinds.outUserId
         res.status(201).json({
-                    message: 'Nurse registered successfully',
-                    userId: result.outBinds.outUserId
-                });
-
-            } catch (error) {
-                console.error('POST /api/admin/register-nurse failed', error);
-                if (error.errorNum === 1 || error.message.includes('ORA-00001')) {
-                    return res.status(409).json({ error: 'Staff ID, Email, or License Number already exists' });
-                }
-                res.status(500).json({ error: 'Server error during registration' });
-            } finally {
-                if (connection) {
-                    try { await connection.close(); } catch (e) { /* ignore */ }
-                }
-            }
+            message: 'Nurse registered successfully',
+            userId: result.outBinds.outUserId
         });
+    } catch (error) {
+        console.error('POST /api/admin/register-nurse failed', error);
+        if (error.errorNum === 1 || error.message.includes('ORA-00001')) {
+            return res.status(409).json({ error: 'Staff ID, Email, or License Number already exists' });
+        }
+        res.status(500).json({ error: 'Server error during registration' });
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { /* ignore */ }
+        }
+    }
+});
 
 // NEW: Get all doctors
 router.get('/doctors', verifyAdmin, async (req, res) => {
@@ -320,12 +285,22 @@ router.post('/allocate-ward-duty', verifyAdmin, async (req, res) => {
     } catch (error) {
         console.error('POST /api/admin/allocate-ward-duty failed', error);
         res.status(500).json({ error: 'Failed to allocate ward duty' });
-        router.get('/dashboard-stats', verifyAdmin, async (req, res) => {
-            let connection;
-            try {
-                connection = await oracledb.getConnection();
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { /* ignore */ }
+        }
+    }
+});
 
-                const counts = await connection.execute(`
+// ---------------------------------------------------------------------------
+// GET /dashboard-stats
+// ---------------------------------------------------------------------------
+router.get('/dashboard-stats', verifyAdmin, async (req, res) => {
+    let connection;
+    try {
+        connection = await oracledb.getConnection();
+
+        const counts = await connection.execute(`
             SELECT 
                 (SELECT COUNT(*) FROM user_auth WHERE role = 'doctor' AND is_active = 1) as total_doctors,
                 (SELECT COUNT(*) FROM patient) as total_patients,
@@ -334,7 +309,7 @@ router.post('/allocate-ward-duty', verifyAdmin, async (req, res) => {
             FROM DUAL
         `);
 
-                const staffDataRes = await connection.execute(`
+        const staffDataRes = await connection.execute(`
             SELECT 
                 u.USER_ID, 
                 u.FULL_NAME, 
@@ -349,31 +324,32 @@ router.post('/allocate-ward-duty', verifyAdmin, async (req, res) => {
             ORDER BY u.FULL_NAME ASC
         `);
 
-                res.json({
-                    stats: counts.rows[0],
-                    staffData: staffDataRes.rows
-                });
-            } catch (error) {
-                console.error('GET /api/admin/dashboard-stats failed', error);
-                res.status(500).json({ error: 'Failed to fetch dashboard stats' });
-            } finally {
-                if (connection) {
-                    try { await connection.close(); } catch (e) { /* ignore */ }
-                }
-            }
+        res.json({
+            stats: counts.rows[0],
+            staffData: staffDataRes.rows
         });
-        // ═══════════════════════════════════════════════════════════
-        //  GET /api/admin/staff/:role
-        //  Fetch staff details using PL/SQL ref cursor
-        // ═══════════════════════════════════════════════════════════
-        router.get('/staff/:role', verifyAdmin, async (req, res) => {
-            let connection;
-            try {
-                connection = await oracledb.getConnection();
-                const role = req.params.role.toLowerCase();
+    } catch (error) {
+        console.error('GET /api/admin/dashboard-stats failed', error);
+        res.status(500).json({ error: 'Failed to fetch dashboard stats' });
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { /* ignore */ }
+        }
+    }
+});
 
-                const result = await connection.execute(
-                    `DECLARE
+// ═══════════════════════════════════════════════════════════════
+//  GET /api/admin/staff/:role
+//  Fetch staff details using PL/SQL ref cursor
+// ═══════════════════════════════════════════════════════════════
+router.get('/staff/:role', verifyAdmin, async (req, res) => {
+    let connection;
+    try {
+        connection = await oracledb.getConnection();
+        const role = req.params.role.toLowerCase();
+
+        const result = await connection.execute(
+            `DECLARE
                 c_staff SYS_REFCURSOR;
              BEGIN
                 IF :role = 'doctor' THEN
@@ -399,41 +375,41 @@ router.post('/allocate-ward-duty', verifyAdmin, async (req, res) => {
                 END IF;
                 :out_cursor := c_staff;
              END;`,
-                    {
-                        role: role,
-                        out_cursor: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
-                    },
-                    { outFormat: oracledb.OUT_FORMAT_OBJECT }
-                );
+            {
+                role: role,
+                out_cursor: { type: oracledb.CURSOR, dir: oracledb.BIND_OUT }
+            },
+            { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
 
-                const cursor = result.outBinds.out_cursor;
-                const rows = [];
-                let row;
-                while ((row = await cursor.getRow())) {
-                    rows.push({
-                        USER_ID: row.USER_ID,
-                        STAFF_ID: row.STAFF_ID,
-                        FULL_NAME: row.FULL_NAME,
-                        EMAIL: row.EMAIL,
-                        ROLE: row.ROLE,
-                        IS_ACTIVE: row.IS_ACTIVE,
-                        LICENSE_NUMBER: row.LICENSE_NUMBER,
-                        // Map the specialized info dynamically to the common fields AdminDashboard uses
-                        SPECIALIST_AREA: role === 'doctor' ? row.SPECIALIZED_INFO : undefined,
-                        ALLOCATED_WARD: role === 'nurse' ? row.SPECIALIZED_INFO : undefined
-                    });
-                }
-                await cursor.close();
+        const cursor = result.outBinds.out_cursor;
+        const rows = [];
+        let row;
+        while ((row = await cursor.getRow())) {
+            rows.push({
+                USER_ID: row.USER_ID,
+                STAFF_ID: row.STAFF_ID,
+                FULL_NAME: row.FULL_NAME,
+                EMAIL: row.EMAIL,
+                ROLE: row.ROLE,
+                IS_ACTIVE: row.IS_ACTIVE,
+                LICENSE_NUMBER: row.LICENSE_NUMBER,
+                // Map the specialized info dynamically to the common fields AdminDashboard uses
+                SPECIALIST_AREA: role === 'doctor' ? row.SPECIALIZED_INFO : undefined,
+                ALLOCATED_WARD: role === 'nurse' ? row.SPECIALIZED_INFO : undefined
+            });
+        }
+        await cursor.close();
 
-                res.json({ staff: rows });
-            } catch (error) {
-                console.error('GET /api/admin/staff/:role failed', error);
-                res.status(500).json({ error: 'Failed to fetch staff by role' });
-            } finally {
-                if (connection) {
-                    try { await connection.close(); } catch (e) { /* ignore */ }
-                }
-            }
-        });
+        res.json({ staff: rows });
+    } catch (error) {
+        console.error('GET /api/admin/staff/:role failed', error);
+        res.status(500).json({ error: 'Failed to fetch staff by role' });
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { /* ignore */ }
+        }
+    }
+});
 
-        module.exports = router;
+module.exports = router;

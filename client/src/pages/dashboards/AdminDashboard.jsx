@@ -111,8 +111,9 @@ export default function AdminDashboard() {
   const [filterDept, setFilterDept] = useState('all');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [formData, setFormData] = useState({ staffId: '', fullName: '', email: '', password: '', role: 'doctor' });
   const [availableNurses, setAvailableNurses] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [staffList, setStaffList] = useState([]);
 
   // Staff Selection Data
   const [adminNurses, setAdminNurses] = useState([]);
@@ -120,22 +121,16 @@ export default function AdminDashboard() {
 
   // Registration Form
   const [formData, setFormData] = useState({
-    staffId: '', fullName: '', email: '', password: '', role: 'doctor',
-    mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: []
+    fullName: '', email: '', password: '', role: 'doctor',
+    mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: ''
   });
 
   // Allocation Form
   const [allocateData, setAllocateData] = useState({
     nurseId: '', doctorId: '', allocatedWard: '', allocationDate: '', shiftTime: ''
-  const [availableNurses, setAvailableNurses] = useState([]);
-    const [dashboardStats, setDashboardStats] = useState(null);
-    const [staffList, setStaffList] = useState([]);
-    const [formData, setFormData] = useState({
-      fullName: '', email: '', password: '', role: 'doctor',
-      mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: ''
-    });
+  });
 
-    useEffect(() => {
+  useEffect(() => {
     const fetchNurses = async () => {
       try {
         const res = await axios.get(`${API_URL}/admin/nurses`, {
@@ -146,7 +141,6 @@ export default function AdminDashboard() {
         console.error('Failed to fetch nurses', err);
       }
     };
-    fetchNurses();
 
     const fetchDashboardData = async () => {
       try {
@@ -235,390 +229,363 @@ export default function AdminDashboard() {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       setMessage({ type: 'success', text: res.data.message || 'Staff registered successfully!' });
-      setFormData({ staffId: '', fullName: '', email: '', password: '', role: 'doctor' });
-      let endpoint = `${API_URL}/auth/register`;
-      if (formData.role === 'doctor') {
-        endpoint = `${API_URL}/admin/register-doctor`;
-      } else if (formData.role === 'nurse') {
-        endpoint = `${API_URL}/admin/register-nurse`;
-      }
-
-      const res = await axios.post(endpoint, formData, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      setMessage({ type: 'success', text: res.data.message || 'Staff registered successfully!' });
       setFormData({
-        staffId: '', fullName: '', email: '', password: '', role: 'doctor',
-        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: []
-      setFormData({
-          fullName: '', email: '', password: '', role: 'doctor',
-          mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: ''
+        fullName: '', email: '', password: '', role: 'doctor',
+        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: ''
       });
       setTimeout(() => setShowModal(false), 1500);
-} catch (err) {
-  setMessage({ type: 'error', text: err.response?.data?.error || 'Registration failed.' });
-} finally {
-  setLoading(false);
-}
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.error || 'Registration failed.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
-useEffect(() => {
-  if (filterDept !== 'all') {
-    const fetchRoleSpecific = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/admin/staff/${filterDept}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        setStaffList(res.data.staff || []);
-      } catch (err) {
-        console.error('Failed to fetch role specific staff', err);
-      }
-    };
-    fetchRoleSpecific();
-  } else {
-    // Refresh general stats if "all" is selected
-    const fetchDashboardData = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/admin/dashboard-stats`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-        });
-        setStaffList(res.data.staffData || []);
-      } catch (err) {
-        console.error('Failed to fetch dashboard data', err);
-      }
-    };
-    fetchDashboardData();
-  }
-}, [filterDept]);
+  useEffect(() => {
+    if (filterDept !== 'all') {
+      const fetchRoleSpecific = async () => {
+        try {
+          const res = await axios.get(`${API_URL}/admin/staff/${filterDept}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          setStaffList(res.data.staff || []);
+        } catch (err) {
+          console.error('Failed to fetch role specific staff', err);
+        }
+      };
+      fetchRoleSpecific();
+    } else {
+      // Refresh general stats if "all" is selected
+      const fetchDashboardData = async () => {
+        try {
+          const res = await axios.get(`${API_URL}/admin/dashboard-stats`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          setStaffList(res.data.staffData || []);
+        } catch (err) {
+          console.error('Failed to fetch dashboard data', err);
+        }
+      };
+      fetchDashboardData();
+    }
+  }, [filterDept]);
 
-const filteredStaff = staffList;
+  const filteredStaff = staffList;
 
-const dynamicStats = dashboardStats ? [
-  {
-    label: 'Total Doctors', value: dashboardStats.TOTAL_DOCTORS || 0, icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.503 4.045 3 5.5L12 21l7-7Z" /><path d="M12 5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2" /><path d="M9 3v2" /><path d="M15 3v2" /><path d="M12 14v4" /><path d="M10 16h4" /></svg>
-    ), color: 'blue', badge: '+4%', badgeColor: 'green'
-  },
-  {
-    label: 'Total Patients', value: dashboardStats.TOTAL_PATIENTS || 0, icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-    ), color: 'purple', badge: '+12%', badgeColor: 'green'
-  },
-  {
-    label: 'Active Appointments', value: dashboardStats.ACTIVE_APPOINTMENTS || 0, icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
-    ), color: 'amber', badge: 'Busy', badgeColor: 'orange'
-  },
-] : stats.slice(0, 3);
+  const dynamicStats = dashboardStats ? [
+    {
+      label: 'Total Doctors', value: dashboardStats.TOTAL_DOCTORS || 0, icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.503 4.045 3 5.5L12 21l7-7Z" /><path d="M12 5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2" /><path d="M9 3v2" /><path d="M15 3v2" /><path d="M12 14v4" /><path d="M10 16h4" /></svg>
+      ), color: 'blue', badge: '+4%', badgeColor: 'green'
+    },
+    {
+      label: 'Total Patients', value: dashboardStats.TOTAL_PATIENTS || 0, icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+      ), color: 'purple', badge: '+12%', badgeColor: 'green'
+    },
+    {
+      label: 'Active Appointments', value: dashboardStats.ACTIVE_APPOINTMENTS || 0, icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
+      ), color: 'amber', badge: 'Busy', badgeColor: 'orange'
+    },
+  ] : stats.slice(0, 3);
 
-return (
-  <div className="admin-layout">
-    {/* Sidebar */}
-    <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.503 4.045 3 5.5L12 21l7-7Z" /></svg>
-        </div>
-        <div className="sidebar-brand-text">
-          <h2>CarePulse</h2>
-          <span>Enterprise HMS</span>
-        </div>
-      </div>
-      <nav className="sidebar-nav">
-        {navItems.map(item => (
-          <button key={item.label} className={`sidebar-nav-item ${item.active ? 'active' : ''}`}>
-            <span className="nav-icon">{item.icon}</span>
-            <span className="nav-label">{item.label}</span>
-          </button>
-        ))}
-      </nav>
-      <div className="sidebar-bottom">
-        <button className="sidebar-bottom-item">
-          <span className="nav-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>
-          </span>
-          Help Center
-        </button>
-        <button className="sidebar-bottom-item logout" onClick={handleLogout}>
-          <span className="nav-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
-          </span>
-          Logout
-        </button>
-      </div>
-    </aside>
-
-    {/* Main Area */}
-    <div className="main-area">
-      <header className="topbar">
-        <div className="topbar-search">
-          <span className="search-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
-          </span>
-          <input type="text" placeholder="Search staff, patients, records..." />
-        </div>
-        <div className="topbar-right">
-          <button className="topbar-icon-btn">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
-            <span className="notif-dot"></span>
-          </button>
-          <div className="topbar-divider"></div>
-          <div className="user-profile">
-            <div className="topbar-avatar">AD</div>
-            <div className="user-info">
-              <span className="user-name">Admin User</span>
-              <span className="user-role">Super Admin</span>
-            </div>
+  return (
+    <div className="admin-layout">
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.503 4.045 3 5.5L12 21l7-7Z" /></svg>
+          </div>
+          <div className="sidebar-brand-text">
+            <h2>CarePulse</h2>
+            <span>Enterprise HMS</span>
           </div>
         </div>
-      </header>
-
-      <main className="page-content">
-        <div className="page-title-row">
-          <div className="page-title">
-            <h1>Staff Management</h1>
-            <p>Oversee hospital personnel and administration roles.</p>
-          </div>
-          <div style={{ display: 'flex', gap: '1rem' }}>
-            <button className="btn-secondary-action" onClick={openAllocateModal}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" x2="19" y1="8" y2="14" /><line x1="16" x2="22" y1="11" y2="11" /></svg>
-              Allocate Duty
+        <nav className="sidebar-nav">
+          {navItems.map(item => (
+            <button key={item.label} className={`sidebar-nav-item ${item.active ? 'active' : ''}`}>
+              <span className="nav-icon">{item.icon}</span>
+              <span className="nav-label">{item.label}</span>
             </button>
-            <button className="btn-primary-add" onClick={() => { setShowModal(true); setMessage({ type: '', text: '' }); }}>
-              ＋ Add New Staff Member
-            </button>
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="stat-cards">
-          {dynamicStats.map((card, idx) => (
-            <div className="stat-card" key={idx}>
-              <div className={`stat-icon ${card.color}`}>{card.icon}</div>
-              <div className="stat-info">
-                <div className="stat-label">{card.label}</div>
-                <div className="stat-value">{card.value}</div>
-              </div>
-              <span className={`stat-badge ${card.badgeColor}`}>{card.badge}</span>
-            </div>
           ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <button className="sidebar-bottom-item">
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>
+            </span>
+            Help Center
+          </button>
+          <button className="sidebar-bottom-item logout" onClick={handleLogout}>
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
+            </span>
+            Logout
+          </button>
         </div>
+      </aside>
 
-        <div className="content-grid">
-          {/* Table Panel */}
-          <div className="table-card">
-            <div className="table-card-header">
-              <h2>Staff Overview</h2>
-              <div className="table-card-controls">
-                <select className="filter-select" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
-                  <option value="all">All Roles</option>
-                  <option value="doctor">Doctors</option>
-                  <option value="nurse">Nurses</option>
-                  <option value="pharmacist">Pharmacists</option>
-                  <option value="reception">Receptionists</option>
-                  <option value="admin">Admins</option>
-                </select>
-                <button className="filter-btn">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9v6l4 3v-9L22 3z" /></svg>
-                </button>
-              </div>
-            </div>
-
-            <table className="staff-table">
-              <thead>
-                <tr>
-                  <th>Name &amp; Role</th>
-                  <th>Department</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStaff.length > 0 ? filteredStaff.map(s => (
-                  <tr key={s.USER_ID || s.ID}>
-                    <td>
-                      <div className="staff-user">
-                        <div className="staff-avatar av-blue">
-                          {s.FULL_NAME ? s.FULL_NAME.substring(0, 2).toUpperCase() : '??'}
-                        </div>
-                        <div>
-                          <div className="staff-name">{s.FULL_NAME}</div>
-                          <div className="staff-role" style={{ textTransform: 'capitalize' }}>{s.ROLE || filterDept}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>{s.SPECIALIST_AREA || s.ALLOCATED_WARD || '—'}</td>
-                    <td>
-                      <span className={`status-badge ${s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'active' : 'deactivated'}`}>
-                        {s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'ACTIVE' : 'DEACTIVATED'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="table-actions">
-                        <button className="action-link edit">Edit</button>
-                        <button className={`action-link ${s.IS_ACTIVE === 1 ? 'deactivate' : 'activate'}`}>
-                          {s.IS_ACTIVE === 1 ? 'Deactivate' : 'Activate'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No staff records found.</td></tr>
-                )}
-              </tbody>
-            </table>
-
-            <div className="table-footer">
-              <span>Showing {filteredStaff.length} of 240 staff members</span>
-              <div className="pagination-btns">
-                <button className="page-btn">‹</button>
-                <button className="page-btn">›</button>
+      {/* Main Area */}
+      <div className="main-area">
+        <header className="topbar">
+          <div className="topbar-search">
+            <span className="search-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+            </span>
+            <input type="text" placeholder="Search staff, patients, records..." />
+          </div>
+          <div className="topbar-right">
+            <button className="topbar-icon-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
+              <span className="notif-dot"></span>
+            </button>
+            <div className="topbar-divider"></div>
+            <div className="user-profile">
+              <div className="topbar-avatar">AD</div>
+              <div className="user-info">
+                <span className="user-name">Admin User</span>
+                <span className="user-role">Super Admin</span>
               </div>
             </div>
           </div>
+        </header>
 
-          {/* Right Panel */}
-          <div className="right-sidebar">
-            <div className="side-card">
-              <div className="side-card-header">Department Load</div>
-              <div className="side-card-body">
-                {deptLoad.map(d => (
-                  <div className="dept-load-item" key={d.name}>
-                    <div className="dept-load-top">
-                      <span className="dept-load-name">{d.name}</span>
-                      <span className="dept-load-pct">{d.pct}%</span>
-                    </div>
-                    <div className="dept-load-bar">
-                      <div className={`dept-load-fill ${d.color}`} style={{ width: `${d.pct}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+        <main className="page-content">
+          <div className="page-title-row">
+            <div className="page-title">
+              <h1>Staff Management</h1>
+              <p>Oversee hospital personnel and administration roles.</p>
             </div>
-
-            <div className="side-card">
-              <div className="side-card-header">Recent Staff Actions</div>
-              <div className="side-card-body">
-                {recentActions.map((a, i) => (
-                  <div className="action-item" key={i}>
-                    <div className={`action-dot ${a.color}`}>{a.icon}</div>
-                    <div className="action-text">
-                      <strong>{a.title}</strong>
-                      <span className="action-desc">{a.desc}</span>
-                      <span>{a.time}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button className="view-all-link">View All Logs</button>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn-secondary-action" onClick={openAllocateModal}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" x2="19" y1="8" y2="14" /><line x1="16" x2="22" y1="11" y2="11" /></svg>
+                Allocate Duty
+              </button>
+              <button className="btn-primary-add" onClick={() => { setShowModal(true); setMessage({ type: '', text: '' }); }}>
+                ＋ Add New Staff Member
+              </button>
             </div>
           </div>
-        </div>
-      </main>
 
-      <footer className="admin-footer">
-        <span>© 2024 CarePulse Health Systems. Confidential Admin Access Only.</span>
-        <div className="footer-links">
-          <a href="#privacy">Privacy Policy</a>
-          <a href="#terms">Terms of Service</a>
-          <a href="#health">System Health</a>
-        </div>
-      </footer>
-    </div>
-
-    {/* Modal */}
-    {showModal && (
-      <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
-        <div className="modal-content">
-          <div className="modal-header">
-            <h3>Add New Staff Member</h3>
-            <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+          {/* Stats Grid */}
+          <div className="stat-cards">
+            {dynamicStats.map((card, idx) => (
+              <div className="stat-card" key={idx}>
+                <div className={`stat-icon ${card.color}`}>{card.icon}</div>
+                <div className="stat-info">
+                  <div className="stat-label">{card.label}</div>
+                  <div className="stat-value">{card.value}</div>
+                </div>
+                <span className={`stat-badge ${card.badgeColor}`}>{card.badge}</span>
+              </div>
+            ))}
           </div>
-          <div className="modal-body">
-            <form className="modal-form" onSubmit={handleSubmit}>
-              {message.text && <div className={`alert alert-${message.type}`}>{message.text}</div>}
 
-              <div className="modal-form-row">
-                <div className="form-field full-width" style={{ flex: 1 }}>
-                  <label>Role</label>
-                  <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} required>
-                    {[
-                      { val: 'admin', label: 'Admin' },
-                      { val: 'doctor', label: 'Doctor' },
-                      { val: 'nurse', label: 'Nurse' },
-                      { val: 'reception', label: 'Receptionist' },
-                      { val: 'pharmacist', label: 'Pharmacist' },
-                      { val: 'patient', label: 'Patient' }
-                    ].map(r => (
-                      <option key={r.val} value={r.val}>{r.label}</option>
-                    ))}
+          <div className="content-grid">
+            {/* Table Panel */}
+            <div className="table-card">
+              <div className="table-card-header">
+                <h2>Staff Overview</h2>
+                <div className="table-card-controls">
+                  <select className="filter-select" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
+                    <option value="all">All Roles</option>
+                    <option value="doctor">Doctors</option>
+                    <option value="nurse">Nurses</option>
+                    <option value="pharmacist">Pharmacists</option>
+                    <option value="reception">Receptionists</option>
+                    <option value="admin">Admins</option>
                   </select>
+                  <button className="filter-btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9v6l4 3v-9L22 3z" /></svg>
+                  </button>
                 </div>
               </div>
 
-              <div className="form-field">
-                <label>Full Name</label>
-                <input type="text" placeholder="e.g. Dr. John Smith" value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} required />
-              </div>
+              <table className="staff-table">
+                <thead>
+                  <tr>
+                    <th>Name &amp; Role</th>
+                    <th>Department</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStaff.length > 0 ? filteredStaff.map(s => (
+                    <tr key={s.USER_ID || s.ID}>
+                      <td>
+                        <div className="staff-user">
+                          <div className="staff-avatar av-blue">
+                            {s.FULL_NAME ? s.FULL_NAME.substring(0, 2).toUpperCase() : '??'}
+                          </div>
+                          <div>
+                            <div className="staff-name">{s.FULL_NAME}</div>
+                            <div className="staff-role" style={{ textTransform: 'capitalize' }}>{s.ROLE || filterDept}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>{s.SPECIALIST_AREA || s.ALLOCATED_WARD || '—'}</td>
+                      <td>
+                        <span className={`status-badge ${s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'active' : 'deactivated'}`}>
+                          {s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'ACTIVE' : 'DEACTIVATED'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="table-actions">
+                          <button className="action-link edit">Edit</button>
+                          <button className={`action-link ${s.IS_ACTIVE === 1 ? 'deactivate' : 'activate'}`}>
+                            {s.IS_ACTIVE === 1 ? 'Deactivate' : 'Activate'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No staff records found.</td></tr>
+                  )}
+                </tbody>
+              </table>
 
-              <div className="modal-form-row">
-                <div className="form-field">
-                  <label>Email Address</label>
-                  <input type="email" placeholder="name@carepulse.local" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} required />
+              <div className="table-footer">
+                <span>Showing {filteredStaff.length} of 240 staff members</span>
+                <div className="pagination-btns">
+                  <button className="page-btn">‹</button>
+                  <button className="page-btn">›</button>
                 </div>
-                <div className="form-field">
-                  <label>Password</label>
-                  <input type="password" placeholder="••••••••" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required minLength="6" />
-                </div>
               </div>
+            </div>
 
-              {(formData.role === 'doctor' || formData.role === 'nurse') && (
-                <>
-                  <div className="modal-form-row">
-                    <div className="form-field">
-                      <label>Mobile Number</label>
-                      <input type="text" placeholder="e.g. 0712345678" value={formData.mobileNumber} onChange={e => setFormData({ ...formData, mobileNumber: e.target.value })} required />
-                    </div>
-                    <div className="form-field">
-                      <label>License Number</label>
-                      <input type="text" placeholder="e.g. RN12345" value={formData.licenseNumber} onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })} required />
-                    </div>
-                  </div>
-
-
-                  <div className="modal-form-row">
-                    <div className="form-field">
-                      <label>Address</label>
-                      <input type="text" placeholder="e.g. 123 Main St" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} required />
-                    </div>
-                    {formData.role === 'doctor' ? (
-                      <div className="form-field">
-                        <label>Specialist Area</label>
-                        <input type="text" placeholder="e.g. Cardiology" value={formData.specialistArea} onChange={e => setFormData({ ...formData, specialistArea: e.target.value })} required />
+            {/* Right Panel */}
+            <div className="right-sidebar">
+              <div className="side-card">
+                <div className="side-card-header">Department Load</div>
+                <div className="side-card-body">
+                  {deptLoad.map(d => (
+                    <div className="dept-load-item" key={d.name}>
+                      <div className="dept-load-top">
+                        <span className="dept-load-name">{d.name}</span>
+                        <span className="dept-load-pct">{d.pct}%</span>
                       </div>
-                    ) : (
-                      <div className="form-field">
-                        <label>Allocated Ward</label>
-                        <input type="text" placeholder="e.g. ICU" value={formData.allocatedWard || ''} onChange={e => setFormData({ ...formData, allocatedWard: e.target.value })} required />
+                      <div className="dept-load-bar">
+                        <div className={`dept-load-fill ${d.color}`} style={{ width: `${d.pct}%` }} />
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-                  {formData.role === 'doctor' && (
-                    <div className="form-field">
-                      <label>Allocate Nurses</label>
-                      <div className="nurse-select-list" style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px' }}>
-                        {availableNurses.map(nurse => (
-                          <label key={nurse.NURSE_ID} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer', fontWeight: 'normal' }}>
-                            <input
-                              type="checkbox"
-                              checked={(formData.nurses || []).includes(nurse.NURSE_ID)}
-                              onChange={() => handleNurseToggle(nurse.NURSE_ID)}
-                            />
-                            {nurse.NAME} ({nurse.ALLOCATED_WARD})
-                          </label>
-                        ))}
-                        {availableNurses.length === 0 && <span style={{ color: '#64748b' }}>No nurses available.</span>}
+              <div className="side-card">
+                <div className="side-card-header">Recent Staff Actions</div>
+                <div className="side-card-body">
+                  {recentActions.map((a, i) => (
+                    <div className="action-item" key={i}>
+                      <div className={`action-dot ${a.color}`}>{a.icon}</div>
+                      <div className="action-text">
+                        <strong>{a.title}</strong>
+                        <span className="action-desc">{a.desc}</span>
+                        <span>{a.time}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button className="view-all-link">View All Logs</button>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <footer className="admin-footer">
+          <span>© 2024 CarePulse Health Systems. Confidential Admin Access Only.</span>
+          <div className="footer-links">
+            <a href="#privacy">Privacy Policy</a>
+            <a href="#terms">Terms of Service</a>
+            <a href="#health">System Health</a>
+          </div>
+        </footer>
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
+          <div className="modal-content">
+            <div className="modal-header">
+              <h3>Add New Staff Member</h3>
+              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <form className="modal-form" onSubmit={handleSubmit}>
+                {message.text && <div className={`alert alert-${message.type}`}>{message.text}</div>}
+
+                <div className="modal-form-row">
+                  <div className="form-field full-width" style={{ flex: 1 }}>
+                    <label>Role</label>
+                    <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} required>
+                      {[
+                        { val: 'admin', label: 'Admin' },
+                        { val: 'doctor', label: 'Doctor' },
+                        { val: 'nurse', label: 'Nurse' },
+                        { val: 'reception', label: 'Receptionist' },
+                        { val: 'pharmacist', label: 'Pharmacist' },
+                        { val: 'patient', label: 'Patient' }
+                      ].map(r => (
+                        <option key={r.val} value={r.val}>{r.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-field">
+                  <label>Full Name</label>
+                  <input type="text" placeholder="e.g. Dr. John Smith" value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} required />
+                </div>
+
+                <div className="modal-form-row">
+                  <div className="form-field">
+                    <label>Email Address</label>
+                    <input type="email" placeholder="name@carepulse.local" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} required />
+                  </div>
+                  <div className="form-field">
+                    <label>Password</label>
+                    <input type="password" placeholder="••••••••" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required minLength="6" />
+                  </div>
+                </div>
+
+                {(formData.role === 'doctor' || formData.role === 'nurse') && (
+                  <>
+                    <div className="modal-form-row">
+                      <div className="form-field">
+                        <label>Mobile Number</label>
+                        <input type="text" placeholder="e.g. 0712345678" value={formData.mobileNumber} onChange={e => setFormData({ ...formData, mobileNumber: e.target.value })} required />
+                      </div>
+                      <div className="form-field">
+                        <label>License Number</label>
+                        <input type="text" placeholder="e.g. RN12345" value={formData.licenseNumber} onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })} required />
+                      </div>
+                    </div>
+
+
+                    <div className="modal-form-row">
+                      <div className="form-field">
+                        <label>Address</label>
+                        <input type="text" placeholder="e.g. 123 Main St" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} required />
+                      </div>
+                      {formData.role === 'doctor' ? (
+                        <div className="form-field">
+                          <label>Specialist Area</label>
+                          <input type="text" placeholder="e.g. Cardiology" value={formData.specialistArea} onChange={e => setFormData({ ...formData, specialistArea: e.target.value })} required />
+                        </div>
+                      ) : (
+                        <div className="form-field">
+                          <label>Allocated Ward</label>
+                          <input type="text" placeholder="e.g. ICU" value={formData.allocatedWard || ''} onChange={e => setFormData({ ...formData, allocatedWard: e.target.value })} required />
+                        </div>
+                      )}
+                    </div>
+
+                    {formData.role === 'doctor' && (
+                      <div className="form-field">
+                        <label>Allocate Nurses</label>
                         <div className="nurse-select-grid" style={{
                           display: 'grid',
                           gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
@@ -663,114 +630,114 @@ return (
                         </div>
                       </div>
                     )}
-                    </>
-                  )}
+                  </>
+                )}
 
-                  <div className="modal-actions" style={{ padding: 0, border: 'none', marginTop: '8px' }}>
-                    <button type="button" className="btn-cancel" onClick={() => setShowModal(false)}>Cancel</button>
-                    <button type="submit" className="btn-submit" disabled={loading}>{loading ? 'Registering...' : 'Register Staff'}</button>
-                  </div>
-                </form>
+                <div className="modal-actions" style={{ padding: 0, border: 'none', marginTop: '8px' }}>
+                  <button type="button" className="btn-cancel" onClick={() => setShowModal(false)}>Cancel</button>
+                  <button type="submit" className="btn-submit" disabled={loading}>{loading ? 'Registering...' : 'Register Staff'}</button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    {/* Allocate Duty Modal */}
-    {showAllocateModal && (
-      <div className="modal-overlay">
-        <div className="modal-container" style={{ maxWidth: '500px' }}>
-          <div className="modal-header">
-            <div>
-              <h2>Allocate Duty</h2>
-              <p>Assign a nurse to a doctor, ward, and shift.</p>
+      {/* Allocate Duty Modal */}
+      {showAllocateModal && (
+        <div className="modal-overlay">
+          <div className="modal-container" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <div>
+                <h2>Allocate Duty</h2>
+                <p>Assign a nurse to a doctor, ward, and shift.</p>
+              </div>
+              <button className="modal-close" onClick={() => setShowAllocateModal(false)}>✕</button>
             </div>
-            <button className="modal-close" onClick={() => setShowAllocateModal(false)}>✕</button>
-          </div>
 
-          <div className="modal-body">
-            {message.text && (
-              <div className={`status-msg ${message.type}`}>
-                {message.text}
-              </div>
-            )}
-
-            <form onSubmit={handleAllocateDuty}>
-              <div className="form-group" style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
-                <button type="button"
-                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--nurse-primary)', background: allocateType === 'doctor' ? 'var(--nurse-primary)' : 'transparent', color: allocateType === 'doctor' ? 'white' : 'var(--nurse-primary)', fontWeight: 'bold', cursor: 'pointer' }}
-                  onClick={() => setAllocateType('doctor')}>
-                  Assign to Doctor
-                </button>
-                <button type="button"
-                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--nurse-primary)', background: allocateType === 'ward' ? 'var(--nurse-primary)' : 'transparent', color: allocateType === 'ward' ? 'white' : 'var(--nurse-primary)', fontWeight: 'bold', cursor: 'pointer' }}
-                  onClick={() => setAllocateType('ward')}>
-                  Assign to Ward
-                </button>
-              </div>
-
-              <div className="form-group">
-                <label>Select Nurse</label>
-                <select required value={allocateData.nurseId} onChange={e => setAllocateData({ ...allocateData, nurseId: e.target.value })}>
-                  <option value="">-- Choose a Nurse --</option>
-                  {adminNurses.map(n => (
-                    <option key={n.NURSE_ID} value={n.NURSE_ID}>{n.NAME} (Ward: {n.ALLOCATED_WARD || 'None'})</option>
-                  ))}
-                </select>
-              </div>
-
-              {allocateType === 'doctor' ? (
-                <div className="form-group">
-                  <label>Select Doctor</label>
-                  <select required value={allocateData.doctorId} onChange={e => setAllocateData({ ...allocateData, doctorId: e.target.value })}>
-                    <option value="">-- Choose a Doctor --</option>
-                    {adminDoctors.map(d => (
-                      <option key={d.DOCTOR_ID} value={d.DOCTOR_ID}>Dr. {d.NAME} ({d.SPECIALIST_AREA})</option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div className="form-group">
-                  <label>Select Ward</label>
-                  <select required value={allocateData.allocatedWard} onChange={e => setAllocateData({ ...allocateData, allocatedWard: e.target.value })}>
-                    <option value="">-- Choose a Ward --</option>
-                    <option value="Ward A">Ward A</option>
-                    <option value="Ward B">Ward B</option>
-                    <option value="ICU">ICU</option>
-                    <option value="Emergency">Emergency</option>
-                    <option value="Pediatrics">Pediatrics</option>
-                  </select>
+            <div className="modal-body">
+              {message.text && (
+                <div className={`status-msg ${message.type}`}>
+                  {message.text}
                 </div>
               )}
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Allocation Date</label>
-                  <input type="date" required value={allocateData.allocationDate} onChange={e => setAllocateData({ ...allocateData, allocationDate: e.target.value })} />
+              <form onSubmit={handleAllocateDuty}>
+                <div className="form-group" style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
+                  <button type="button"
+                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--nurse-primary)', background: allocateType === 'doctor' ? 'var(--nurse-primary)' : 'transparent', color: allocateType === 'doctor' ? 'white' : 'var(--nurse-primary)', fontWeight: 'bold', cursor: 'pointer' }}
+                    onClick={() => setAllocateType('doctor')}>
+                    Assign to Doctor
+                  </button>
+                  <button type="button"
+                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--nurse-primary)', background: allocateType === 'ward' ? 'var(--nurse-primary)' : 'transparent', color: allocateType === 'ward' ? 'white' : 'var(--nurse-primary)', fontWeight: 'bold', cursor: 'pointer' }}
+                    onClick={() => setAllocateType('ward')}>
+                    Assign to Ward
+                  </button>
                 </div>
+
                 <div className="form-group">
-                  <label>Shift Time</label>
-                  <select required value={allocateData.shiftTime} onChange={e => setAllocateData({ ...allocateData, shiftTime: e.target.value })}>
-                    <option value="">- Select -</option>
-                    <option value="Morning Shift">Morning (08:00 - 16:00)</option>
-                    <option value="Evening Shift">Evening (16:00 - 00:00)</option>
-                    <option value="Night Shift">Night (00:00 - 08:00)</option>
-                    <option value="Full Day">Full Day</option>
+                  <label>Select Nurse</label>
+                  <select required value={allocateData.nurseId} onChange={e => setAllocateData({ ...allocateData, nurseId: e.target.value })}>
+                    <option value="">-- Choose a Nurse --</option>
+                    {adminNurses.map(n => (
+                      <option key={n.NURSE_ID} value={n.NURSE_ID}>{n.NAME} (Ward: {n.ALLOCATED_WARD || 'None'})</option>
+                    ))}
                   </select>
                 </div>
-              </div>
 
-              <div className="modal-footer" style={{ marginTop: '2rem' }}>
-                <button type="button" className="btn-secondary" onClick={() => setShowAllocateModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary" disabled={loading}>
-                  {loading ? 'Allocating...' : 'Confirm Allocation'}
-                </button>
-              </div>
-            </form>
+                {allocateType === 'doctor' ? (
+                  <div className="form-group">
+                    <label>Select Doctor</label>
+                    <select required value={allocateData.doctorId} onChange={e => setAllocateData({ ...allocateData, doctorId: e.target.value })}>
+                      <option value="">-- Choose a Doctor --</option>
+                      {adminDoctors.map(d => (
+                        <option key={d.DOCTOR_ID} value={d.DOCTOR_ID}>Dr. {d.NAME} ({d.SPECIALIST_AREA})</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label>Select Ward</label>
+                    <select required value={allocateData.allocatedWard} onChange={e => setAllocateData({ ...allocateData, allocatedWard: e.target.value })}>
+                      <option value="">-- Choose a Ward --</option>
+                      <option value="Ward A">Ward A</option>
+                      <option value="Ward B">Ward B</option>
+                      <option value="ICU">ICU</option>
+                      <option value="Emergency">Emergency</option>
+                      <option value="Pediatrics">Pediatrics</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Allocation Date</label>
+                    <input type="date" required value={allocateData.allocationDate} onChange={e => setAllocateData({ ...allocateData, allocationDate: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Shift Time</label>
+                    <select required value={allocateData.shiftTime} onChange={e => setAllocateData({ ...allocateData, shiftTime: e.target.value })}>
+                      <option value="">- Select -</option>
+                      <option value="Morning Shift">Morning (08:00 - 16:00)</option>
+                      <option value="Evening Shift">Evening (16:00 - 00:00)</option>
+                      <option value="Night Shift">Night (00:00 - 08:00)</option>
+                      <option value="Full Day">Full Day</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="modal-footer" style={{ marginTop: '2rem' }}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowAllocateModal(false)}>Cancel</button>
+                  <button type="submit" className="btn-primary" disabled={loading}>
+                    {loading ? 'Allocating...' : 'Confirm Allocation'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
-      </div>
-    )}
-  </div>
-);
+      )}
+    </div>
+  );
 }

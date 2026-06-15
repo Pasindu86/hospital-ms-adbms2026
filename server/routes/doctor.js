@@ -65,7 +65,7 @@ router.get('/appointments/today', async (req, res) => {
          ''                AS SYMPTOMS
        FROM DOCTOR_PATIENT dp
        JOIN PATIENT p ON dp.PATIENT_ID = p.PATIENT_ID
-       WHERE dp.DOCTOR_ID = :doctorId`
+       WHERE dp.DOCTOR_ID = :doctorId`,
       { doctorId }
     )
     res.json({ appointments: result.rows })
@@ -235,13 +235,13 @@ router.post('/treatments', async (req, res) => {
 
     // Call PL/SQL procedure
     const bindVars = {
-      p_appointment_id:  appointmentId,
-      p_patient_id:      patientId,
-      p_doctor_id:       doctorId,
-      p_diagnosis:       diagnosis,
+      p_appointment_id: appointmentId,
+      p_patient_id: patientId,
+      p_doctor_id: doctorId,
+      p_diagnosis: diagnosis,
       p_clinical_advice: clinicalAdvice || '',
       p_treatment_notes: treatmentNotes || '',
-      p_record_id:       { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
+      p_record_id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
     }
 
     const result = await connection.execute(
