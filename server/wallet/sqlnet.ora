@@ -1,2 +1,2 @@
-WALLET_LOCATION = (SOURCE = (METHOD = file) (METHOD_DATA = (DIRECTORY="F:\projects\hospital-ms-adbms2026\server\wallet")))
+WALLET_LOCATION = (SOURCE = (METHOD = file) (METHOD_DATA = (DIRECTORY="D:\New folder (3)\hospital-ms-adbms2026\server\wallet)))
 SSL_SERVER_DN_MATCH=yes
