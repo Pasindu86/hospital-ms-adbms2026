@@ -9,7 +9,7 @@ export default function NurseDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [nurseData, setNurseData] = useState(null);
-  const [patients, setPatients] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -27,13 +27,13 @@ export default function NurseDashboard() {
 
       const headers = { Authorization: `Bearer ${token}` };
 
-      const [nurseRes, patientsRes] = await Promise.all([
+      const [nurseRes, apptsRes] = await Promise.all([
         axios.get(`${API_URL}/nurse/me`, { headers }),
-        axios.get(`${API_URL}/nurse/ward/patients`, { headers })
+        axios.get(`${API_URL}/nurse/appointments`, { headers })
       ]);
 
       setNurseData(nurseRes.data);
-      setPatients(patientsRes.data.patients);
+      setAppointments(apptsRes.data.appointments);
     } catch (err) {
       console.error('Error fetching nurse data:', err);
       setError('Failed to load dashboard data. Please try again later.');
@@ -143,10 +143,10 @@ export default function NurseDashboard() {
         </div>
 
         <div className="nurse-content-grid">
-          {/* Patients in Ward */}
+          {/* Appointment Queue */}
           <div className="nurse-panel">
             <div className="nurse-panel-header">
-              <h2>Patients in {profile.ALLOCATED_WARD || 'Ward'}</h2>
+              <h2>Today's Appointment Queue</h2>
               <button style={{ color: 'var(--nurse-primary)', background: 'transparent', border: 'none', fontWeight: 600, cursor: 'pointer' }}>View All</button>
             </div>
             <div style={{ overflowX: 'auto' }}>
@@ -155,23 +155,23 @@ export default function NurseDashboard() {
                   <tr>
                     <th>Patient Name</th>
                     <th>ID</th>
-                    <th>Diagnosis</th>
-                    <th>Contact</th>
+                    <th>Diagnosis/Issue</th>
+                    <th>Doctor</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {patients.length > 0 ? patients.map(p => (
-                    <tr key={p.PATIENT_ID}>
-                      <td style={{ fontWeight: 600 }}>{p.NAME}</td>
-                      <td style={{ color: '#64748b' }}>#{p.PATIENT_ID}</td>
-                      <td>{p.DISEASE}</td>
-                      <td>{p.PHONE_NUMBER}</td>
-                      <td><span className="badge-ward">Stable</span></td>
+                  {appointments.length > 0 ? appointments.map(appt => (
+                    <tr key={appt.APPOINTMENT_ID}>
+                      <td style={{ fontWeight: 600 }}>{appt.PATIENT_NAME}</td>
+                      <td style={{ color: '#64748b' }}>#{appt.PATIENT_ID}</td>
+                      <td>{appt.DISEASE}</td>
+                      <td>{appt.DOCTOR_NAME || 'Unassigned'}</td>
+                      <td><span className="badge-ward">{appt.STATUS}</span></td>
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>No patients found for this ward.</td>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>No appointments scheduled for today.</td>
                     </tr>
                   )}
                 </tbody>

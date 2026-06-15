@@ -91,8 +91,8 @@ router.get('/me', async (req, res) => {
     }
 })
 
-// GET /ward/patients - Fetch patients in the same ward
-router.get('/ward/patients', async (req, res) => {
+// GET /appointments - Fetch appointment queue for today
+router.get('/appointments', async (req, res) => {
     let connection
     try {
         connection = await oracledb.getConnection()
@@ -101,25 +101,26 @@ router.get('/ward/patients', async (req, res) => {
             return res.status(404).json({ error: 'Nurse user not found' })
         }
 
-        const ward = profile.ALLOCATED_WARD
-
-        if (!ward || ward === 'Unassigned') {
-            return res.json({ patients: [] })
-        }
-
-        // This is a placeholder logic as patients aren't explicitly assigned to wards in the current schema
-        // but we can fetch patients who have active appointments today as a surrogate
-        // or patients who might have 'ward' in their notes/disease.
-        // For now, let's just return recently registered patients as a demonstration.
+        // Fetch today's appointments. If the nurse is allocated to specific doctors, we could filter by those,
+        // but generally a ward nurse might see the whole ward's queue. Let's fetch all today's appointments.
         const result = await connection.execute(
-            `SELECT PATIENT_ID, NAME, GENDER, DISEASE, PHONE_NUMBER
-         FROM PATIENTS
-         ORDER BY PATIENT_ID DESC
-         FETCH FIRST 10 ROWS ONLY`
+            `SELECT 
+                a.APPOINTMENT_ID, 
+                p.NAME AS PATIENT_NAME, 
+                p.PATIENT_ID, 
+                p.DISEASE, 
+                p.PHONE_NUMBER,
+                a.STATUS,
+                d.NAME AS DOCTOR_NAME
+             FROM PATIENT_DOCTOR_APPOINTMENT a
+             JOIN PATIENT p ON a.PATIENT_ID = p.PATIENT_ID
+             LEFT JOIN DOCTOR d ON a.DOCTOR_ID = d.DOCTOR_ID
+             WHERE TRUNC(a.APPOINTMENT_DATE) = TRUNC(SYSDATE)
+             ORDER BY a.APPOINTMENT_DATE ASC`
         )
-        res.json({ patients: result.rows })
+        res.json({ appointments: result.rows })
     } catch (error) {
-        console.error('GET /api/nurse/ward/patients failed', error)
+        console.error('GET /api/nurse/appointments failed', error)
         res.status(500).json({ error: 'Database error' })
     } finally {
         if (connection) try { await connection.close() } catch (e) { }

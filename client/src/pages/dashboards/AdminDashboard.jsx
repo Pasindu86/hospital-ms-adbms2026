@@ -110,9 +110,11 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [availableNurses, setAvailableNurses] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [staffList, setStaffList] = useState([]);
   const [formData, setFormData] = useState({ 
-    staffId: '', fullName: '', email: '', password: '', role: 'doctor',
-    mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: []
+    fullName: '', email: '', password: '', role: 'doctor',
+    mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: ''
   });
 
   useEffect(() => {
@@ -126,7 +128,21 @@ export default function AdminDashboard() {
         console.error('Failed to fetch nurses', err);
       }
     };
+    
+    const fetchDashboardData = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/admin/dashboard-stats`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        setDashboardStats(res.data.stats);
+        setStaffList(res.data.staffData);
+      } catch (err) {
+        console.error('Failed to fetch dashboard data', err);
+      }
+    };
+
     fetchNurses();
+    fetchDashboardData();
   }, []);
 
   const handleNurseToggle = (nurseId) => {
@@ -163,8 +179,8 @@ export default function AdminDashboard() {
       });
       setMessage({ type: 'success', text: res.data.message || 'Staff registered successfully!' });
       setFormData({ 
-        staffId: '', fullName: '', email: '', password: '', role: 'doctor',
-        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: []
+        fullName: '', email: '', password: '', role: 'doctor',
+        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: ''
       });
       setTimeout(() => setShowModal(false), 1500);
     } catch (err) {
@@ -174,9 +190,54 @@ export default function AdminDashboard() {
     }
   };
 
-  const filteredStaff = filterDept === 'all'
-    ? staffData
-    : staffData.filter(s => s.dept.toLowerCase().includes(filterDept.toLowerCase()));
+  useEffect(() => {
+    if (filterDept !== 'all') {
+      const fetchRoleSpecific = async () => {
+        try {
+          const res = await axios.get(`${API_URL}/admin/staff/${filterDept}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          setStaffList(res.data.staff || []);
+        } catch (err) {
+          console.error('Failed to fetch role specific staff', err);
+        }
+      };
+      fetchRoleSpecific();
+    } else {
+      // Refresh general stats if "all" is selected
+      const fetchDashboardData = async () => {
+        try {
+          const res = await axios.get(`${API_URL}/admin/dashboard-stats`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          setStaffList(res.data.staffData || []);
+        } catch (err) {
+          console.error('Failed to fetch dashboard data', err);
+        }
+      };
+      fetchDashboardData();
+    }
+  }, [filterDept]);
+
+  const filteredStaff = staffList;
+
+  const dynamicStats = dashboardStats ? [
+    {
+      label: 'Total Doctors', value: dashboardStats.TOTAL_DOCTORS || 0, icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.503 4.045 3 5.5L12 21l7-7Z" /><path d="M12 5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2" /><path d="M9 3v2" /><path d="M15 3v2" /><path d="M12 14v4" /><path d="M10 16h4" /></svg>
+      ), color: 'blue', badge: '+4%', badgeColor: 'green'
+    },
+    {
+      label: 'Total Patients', value: dashboardStats.TOTAL_PATIENTS || 0, icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+      ), color: 'purple', badge: '+12%', badgeColor: 'green'
+    },
+    {
+      label: 'Active Appointments', value: dashboardStats.ACTIVE_APPOINTMENTS || 0, icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
+      ), color: 'amber', badge: 'Busy', badgeColor: 'orange'
+    },
+  ] : stats.slice(0, 3);
 
   return (
     <div className="admin-layout">
@@ -253,7 +314,7 @@ export default function AdminDashboard() {
 
           {/* Stats Grid */}
           <div className="stat-cards">
-            {stats.map((card, idx) => (
+            {dynamicStats.map((card, idx) => (
               <div className="stat-card" key={idx}>
                 <div className={`stat-icon ${card.color}`}>{card.icon}</div>
                 <div className="stat-info">
@@ -272,11 +333,12 @@ export default function AdminDashboard() {
                 <h2>Staff Overview</h2>
                 <div className="table-card-controls">
                   <select className="filter-select" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
-                    <option value="all">All Departments</option>
-                    <option value="general">General Surgery</option>
-                    <option value="cardiology">Cardiology</option>
-                    <option value="pharmacy">Main Pharmacy</option>
-                    <option value="front">Front Desk</option>
+                    <option value="all">All Roles</option>
+                    <option value="doctor">Doctors</option>
+                    <option value="nurse">Nurses</option>
+                    <option value="pharmacist">Pharmacists</option>
+                    <option value="reception">Receptionists</option>
+                    <option value="admin">Admins</option>
                   </select>
                   <button className="filter-btn">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9v6l4 3v-9L22 3z" /></svg>
@@ -294,29 +356,37 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredStaff.map(s => (
-                    <tr key={s.id}>
+                  {filteredStaff.length > 0 ? filteredStaff.map(s => (
+                    <tr key={s.USER_ID || s.ID}>
                       <td>
                         <div className="staff-user">
-                          <div className={`staff-avatar ${s.avColor}`}>{s.initials}</div>
+                          <div className="staff-avatar av-blue">
+                            {s.FULL_NAME ? s.FULL_NAME.substring(0, 2).toUpperCase() : '??'}
+                          </div>
                           <div>
-                            <div className="staff-name">{s.name}</div>
-                            <div className="staff-role">{s.role}</div>
+                            <div className="staff-name">{s.FULL_NAME}</div>
+                            <div className="staff-role" style={{textTransform: 'capitalize'}}>{s.ROLE || filterDept}</div>
                           </div>
                         </div>
                       </td>
-                      <td>{s.dept}</td>
-                      <td><span className={`status-badge ${s.status}`}>{s.status.toUpperCase()}</span></td>
+                      <td>{s.SPECIALIST_AREA || s.ALLOCATED_WARD || '—'}</td>
+                      <td>
+                        <span className={`status-badge ${s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'active' : 'deactivated'}`}>
+                          {s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'ACTIVE' : 'DEACTIVATED'}
+                        </span>
+                      </td>
                       <td>
                         <div className="table-actions">
                           <button className="action-link edit">Edit</button>
-                          <button className={`action-link ${s.status === 'active' ? 'deactivate' : 'activate'}`}>
-                            {s.status === 'active' ? 'Deactivate' : 'Activate'}
+                          <button className={`action-link ${s.IS_ACTIVE === 1 ? 'deactivate' : 'activate'}`}>
+                            {s.IS_ACTIVE === 1 ? 'Deactivate' : 'Activate'}
                           </button>
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr><td colSpan="4" style={{textAlign: 'center', padding: '20px', color: '#64748b'}}>No staff records found.</td></tr>
+                  )}
                 </tbody>
               </table>
 
@@ -391,11 +461,7 @@ export default function AdminDashboard() {
                 {message.text && <div className={`alert alert-${message.type}`}>{message.text}</div>}
 
                 <div className="modal-form-row">
-                  <div className="form-field">
-                    <label>Staff ID</label>
-                    <input type="text" placeholder="e.g. 0012" value={formData.staffId} onChange={e => setFormData({ ...formData, staffId: e.target.value })} required />
-                  </div>
-                  <div className="form-field">
+                  <div className="form-field full-width" style={{flex: 1}}>
                     <label>Role</label>
                     <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} required>
                       {[
@@ -462,18 +528,47 @@ export default function AdminDashboard() {
                     {formData.role === 'doctor' && (
                       <div className="form-field">
                         <label>Allocate Nurses</label>
-                        <div className="nurse-select-list" style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px' }}>
-                          {availableNurses.map(nurse => (
-                            <label key={nurse.NURSE_ID} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer', fontWeight: 'normal' }}>
-                              <input 
-                                type="checkbox" 
-                                checked={(formData.nurses || []).includes(nurse.NURSE_ID)}
-                                onChange={() => handleNurseToggle(nurse.NURSE_ID)}
-                              />
-                              {nurse.NAME} ({nurse.ALLOCATED_WARD})
-                            </label>
-                          ))}
-                          {availableNurses.length === 0 && <span style={{ color: '#64748b' }}>No nurses available.</span>}
+                        <div className="nurse-select-grid" style={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', 
+                            gap: '12px', 
+                            maxHeight: '220px', 
+                            overflowY: 'auto', 
+                            padding: '4px' 
+                          }}>
+                          {availableNurses.map(nurse => {
+                            const isSelected = (formData.nurses || []).includes(nurse.NURSE_ID);
+                            return (
+                              <div key={nurse.NURSE_ID} onClick={() => handleNurseToggle(nurse.NURSE_ID)} 
+                                style={{ 
+                                  border: `1px solid ${isSelected ? '#3b82f6' : '#e2e8f0'}`,
+                                  backgroundColor: isSelected ? '#eff6ff' : '#fff',
+                                  borderRadius: '8px', 
+                                  padding: '12px', 
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '12px',
+                                  transition: 'all 0.2s',
+                                  boxShadow: isSelected ? '0 2px 4px rgba(59, 130, 246, 0.1)' : 'none'
+                                }}>
+                                <div style={{
+                                  width: '20px', height: '20px', borderRadius: '4px',
+                                  border: `1.5px solid ${isSelected ? '#3b82f6' : '#cbd5e1'}`,
+                                  backgroundColor: isSelected ? '#3b82f6' : '#fff',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  {isSelected && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                                </div>
+                                <div style={{flex: 1, minWidth: 0}}>
+                                  <div style={{fontWeight: 600, fontSize: '13px', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}}>{nurse.NAME}</div>
+                                  <div style={{fontSize: '11px', color: '#64748b'}}>{nurse.ALLOCATED_WARD || 'General Ward'}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {availableNurses.length === 0 && <span style={{ color: '#64748b', fontStyle: 'italic', padding: '10px' }}>No nurses available.</span>}
                         </div>
                       </div>
                     )}
