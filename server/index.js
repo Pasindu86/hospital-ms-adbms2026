@@ -42,12 +42,9 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes)
 app.use('/api/nurse', nurseRoutes)
-<<<<<<< Updated upstream
 app.use('/api/admin', adminRoutes)
-=======
 app.use('/api/doctor', doctorRoutes)
 app.use('/api/patients', patientRoutes)
->>>>>>> Stashed changes
 
 app.get('/api/users', async (req, res) => {
   let connection
