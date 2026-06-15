@@ -35,7 +35,9 @@ export default function ReceptionDashboard() {
   const [apptData, setApptData] = useState({
     doctorId: '',
     appointmentDate: '',
-    notes: ''
+    notes: '',
+    doctorCharges: '',
+    hospitalCharges: ''
   })
 
   // Safe user parsing from localStorage
@@ -119,15 +121,25 @@ export default function ReceptionDashboard() {
     setMessage({ type: '', text: '' })
     try {
       const token = localStorage.getItem('token')
+      const doctorChargesNum = parseFloat(apptData.doctorCharges) || 0
+      const hospitalChargesNum = parseFloat(apptData.hospitalCharges) || 0
+      const totalPayment = doctorChargesNum + hospitalChargesNum
       await axios.post(`${API_URL}/patients/appointment`, {
         patientId: selectedPatient.patientId,
-        ...apptData
+        doctorId: apptData.doctorId,
+        appointmentDate: apptData.appointmentDate,
+        notes: apptData.notes,
+        paymentMethod: 'Cash',
+        paymentStatus: 'Pending',
+        doctorCharges: doctorChargesNum,
+        hospitalCharges: hospitalChargesNum,
+        totalPayment
       }, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setMessage({ type: 'success', text: `Appointment successfully booked for ${selectedPatient.name}!` })
+      setMessage({ type: 'success', text: `Appointment booked for ${selectedPatient.name}! Total: Rs. ${totalPayment.toFixed(2)}` })
       setSelectedPatient(null)
-      setApptData({ doctorId: '', appointmentDate: '', notes: '' })
+      setApptData({ doctorId: '', appointmentDate: '', notes: '', doctorCharges: '', hospitalCharges: '' })
       setPatientSearch('')
       fetchPatients()
     } catch (err) {
@@ -307,6 +319,40 @@ export default function ReceptionDashboard() {
                     <div className="form-group">
                       <label>Internal Notes</label>
                       <input type="text" value={apptData.notes} onChange={(e) => setApptData({ ...apptData, notes: e.target.value })} placeholder="Internal instructions..." />
+                    </div>
+
+                    <div className="payment-breakdown-section">
+                      <div className="payment-breakdown-title">💰 Payment Summary</div>
+                      <div className="payment-breakdown-fields">
+                        <div className="form-group">
+                          <label>Doctor Charges (Rs.)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={apptData.doctorCharges}
+                            onChange={(e) => setApptData({ ...apptData, doctorCharges: e.target.value })}
+                            placeholder="e.g. 1500.00"
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label>Hospital Charges (Rs.)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={apptData.hospitalCharges}
+                            onChange={(e) => setApptData({ ...apptData, hospitalCharges: e.target.value })}
+                            placeholder="e.g. 500.00"
+                          />
+                        </div>
+                      </div>
+                      <div className="payment-breakdown-total">
+                        <span className="payment-total-label">Total Payment</span>
+                        <span className="payment-total-value">
+                          Rs. {((parseFloat(apptData.doctorCharges) || 0) + (parseFloat(apptData.hospitalCharges) || 0)).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
 
                     <button type="submit" className="btn-register-submit" disabled={actionLoading}>
