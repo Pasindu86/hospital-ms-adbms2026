@@ -10,7 +10,7 @@ case `uname` in
 esac
 
 if [ -x "$basedir/node" ]; then
-  exec "$basedir/node"  "$basedir/../bcryptjs/bin/bcrypt" "$@"
+  exec "$basedir/node"  "$basedir/../touch/bin/nodetouch.js" "$@"
 else 
-  exec node  "$basedir/../bcryptjs/bin/bcrypt" "$@"
+  exec node  "$basedir/../touch/bin/nodetouch.js" "$@"
 fi
