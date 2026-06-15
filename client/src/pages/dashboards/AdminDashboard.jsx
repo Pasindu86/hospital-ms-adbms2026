@@ -106,10 +106,91 @@ const navItems = [
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
+  const [showAllocateModal, setShowAllocateModal] = useState(false);
+  const [allocateType, setAllocateType] = useState('doctor'); // 'doctor' or 'ward'
   const [filterDept, setFilterDept] = useState('all');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [formData, setFormData] = useState({ staffId: '', fullName: '', email: '', password: '', role: 'doctor' });
+  const [availableNurses, setAvailableNurses] = useState([]);
+
+  // Staff Selection Data
+  const [adminNurses, setAdminNurses] = useState([]);
+  const [adminDoctors, setAdminDoctors] = useState([]);
+
+  // Registration Form
+  const [formData, setFormData] = useState({
+    staffId: '', fullName: '', email: '', password: '', role: 'doctor',
+    mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: []
+  });
+
+  // Allocation Form
+  const [allocateData, setAllocateData] = useState({
+    nurseId: '', doctorId: '', allocatedWard: '', allocationDate: '', shiftTime: ''
+  });
+
+  useEffect(() => {
+    const fetchNurses = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/admin/nurses`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        setAvailableNurses(res.data.nurses || []);
+      } catch (err) {
+        console.error('Failed to fetch nurses', err);
+      }
+    };
+    fetchNurses();
+  }, []);
+
+  const handleNurseToggle = (nurseId) => {
+    setFormData(prev => {
+      const current = prev.nurses || [];
+      if (current.includes(nurseId)) {
+        return { ...prev, nurses: current.filter(id => id !== nurseId) };
+      } else {
+        return { ...prev, nurses: [...current, nurseId] };
+      }
+    });
+  };
+
+  const openAllocateModal = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
+      const [nursesRes, doctorsRes] = await Promise.all([
+        axios.get(`${API_URL}/admin/nurses`, { headers }),
+        axios.get(`${API_URL}/admin/doctors`, { headers })
+      ]);
+      setAdminNurses(nursesRes.data.nurses || []);
+      setAdminDoctors(doctorsRes.data.doctors || []);
+      setShowAllocateModal(true);
+      setMessage({ type: '', text: '' });
+    } catch (err) {
+      console.error('Failed to load staff for allocation:', err);
+    }
+  };
+
+  const handleAllocateDuty = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+    try {
+      const endpoint = allocateType === 'doctor'
+        ? `${API_URL}/admin/allocate-doctor-duty`
+        : `${API_URL}/admin/allocate-ward-duty`;
+
+      const res = await axios.post(endpoint, allocateData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setMessage({ type: 'success', text: res.data.message || 'Duty allocated successfully!' });
+      setAllocateData({ nurseId: '', doctorId: '', allocatedWard: '', allocationDate: '', shiftTime: '' });
+      setTimeout(() => setShowAllocateModal(false), 1500);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.error || 'Allocation failed.' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -127,6 +208,21 @@ export default function AdminDashboard() {
       });
       setMessage({ type: 'success', text: res.data.message || 'Staff registered successfully!' });
       setFormData({ staffId: '', fullName: '', email: '', password: '', role: 'doctor' });
+      let endpoint = `${API_URL}/auth/register`;
+      if (formData.role === 'doctor') {
+        endpoint = `${API_URL}/admin/register-doctor`;
+      } else if (formData.role === 'nurse') {
+        endpoint = `${API_URL}/admin/register-nurse`;
+      }
+
+      const res = await axios.post(endpoint, formData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setMessage({ type: 'success', text: res.data.message || 'Staff registered successfully!' });
+      setFormData({
+        staffId: '', fullName: '', email: '', password: '', role: 'doctor',
+        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: []
+      });
       setTimeout(() => setShowModal(false), 1500);
     } catch (err) {
       setMessage({ type: 'error', text: err.response?.data?.error || 'Registration failed.' });
@@ -207,9 +303,15 @@ export default function AdminDashboard() {
               <h1>Staff Management</h1>
               <p>Oversee hospital personnel and administration roles.</p>
             </div>
-            <button className="btn-primary-add" onClick={() => { setShowModal(true); setMessage({ type: '', text: '' }); }}>
-              ＋ Add New Staff Member
-            </button>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn-secondary-action" onClick={openAllocateModal}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" x2="19" y1="8" y2="14" /><line x1="16" x2="22" y1="11" y2="11" /></svg>
+                Allocate Duty
+              </button>
+              <button className="btn-primary-add" onClick={() => { setShowModal(true); setMessage({ type: '', text: '' }); }}>
+                ＋ Add New Staff Member
+              </button>
+            </div>
           </div>
 
           {/* Stats Grid */}
@@ -389,9 +491,157 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {(formData.role === 'doctor' || formData.role === 'nurse') && (
+                  <>
+                    <div className="modal-form-row">
+                      <div className="form-field">
+                        <label>Mobile Number</label>
+                        <input type="text" placeholder="e.g. 0712345678" value={formData.mobileNumber} onChange={e => setFormData({ ...formData, mobileNumber: e.target.value })} required />
+                      </div>
+                      <div className="form-field">
+                        <label>License Number</label>
+                        <input type="text" placeholder="e.g. RN12345" value={formData.licenseNumber} onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })} required />
+                      </div>
+                    </div>
+
+                    <div className="modal-form-row">
+                      <div className="form-field">
+                        <label>Address</label>
+                        <input type="text" placeholder="e.g. 123 Main St" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} required />
+                      </div>
+                      {formData.role === 'doctor' ? (
+                        <div className="form-field">
+                          <label>Specialist Area</label>
+                          <input type="text" placeholder="e.g. Cardiology" value={formData.specialistArea} onChange={e => setFormData({ ...formData, specialistArea: e.target.value })} required />
+                        </div>
+                      ) : (
+                        <div className="form-field">
+                          <label>Allocated Ward</label>
+                          <input type="text" placeholder="e.g. ICU" value={formData.allocatedWard || ''} onChange={e => setFormData({ ...formData, allocatedWard: e.target.value })} required />
+                        </div>
+                      )}
+                    </div>
+
+                    {formData.role === 'doctor' && (
+                      <div className="form-field">
+                        <label>Allocate Nurses</label>
+                        <div className="nurse-select-list" style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px' }}>
+                          {availableNurses.map(nurse => (
+                            <label key={nurse.NURSE_ID} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer', fontWeight: 'normal' }}>
+                              <input
+                                type="checkbox"
+                                checked={(formData.nurses || []).includes(nurse.NURSE_ID)}
+                                onChange={() => handleNurseToggle(nurse.NURSE_ID)}
+                              />
+                              {nurse.NAME} ({nurse.ALLOCATED_WARD})
+                            </label>
+                          ))}
+                          {availableNurses.length === 0 && <span style={{ color: '#64748b' }}>No nurses available.</span>}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <div className="modal-actions" style={{ padding: 0, border: 'none', marginTop: '8px' }}>
                   <button type="button" className="btn-cancel" onClick={() => setShowModal(false)}>Cancel</button>
                   <button type="submit" className="btn-submit" disabled={loading}>{loading ? 'Registering...' : 'Register Staff'}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Allocate Duty Modal */}
+      {showAllocateModal && (
+        <div className="modal-overlay">
+          <div className="modal-container" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <div>
+                <h2>Allocate Duty</h2>
+                <p>Assign a nurse to a doctor, ward, and shift.</p>
+              </div>
+              <button className="modal-close" onClick={() => setShowAllocateModal(false)}>✕</button>
+            </div>
+
+            <div className="modal-body">
+              {message.text && (
+                <div className={`status-msg ${message.type}`}>
+                  {message.text}
+                </div>
+              )}
+
+              <form onSubmit={handleAllocateDuty}>
+                <div className="form-group" style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
+                  <button type="button"
+                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--nurse-primary)', background: allocateType === 'doctor' ? 'var(--nurse-primary)' : 'transparent', color: allocateType === 'doctor' ? 'white' : 'var(--nurse-primary)', fontWeight: 'bold', cursor: 'pointer' }}
+                    onClick={() => setAllocateType('doctor')}>
+                    Assign to Doctor
+                  </button>
+                  <button type="button"
+                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--nurse-primary)', background: allocateType === 'ward' ? 'var(--nurse-primary)' : 'transparent', color: allocateType === 'ward' ? 'white' : 'var(--nurse-primary)', fontWeight: 'bold', cursor: 'pointer' }}
+                    onClick={() => setAllocateType('ward')}>
+                    Assign to Ward
+                  </button>
+                </div>
+
+                <div className="form-group">
+                  <label>Select Nurse</label>
+                  <select required value={allocateData.nurseId} onChange={e => setAllocateData({ ...allocateData, nurseId: e.target.value })}>
+                    <option value="">-- Choose a Nurse --</option>
+                    {adminNurses.map(n => (
+                      <option key={n.NURSE_ID} value={n.NURSE_ID}>{n.NAME} (Ward: {n.ALLOCATED_WARD || 'None'})</option>
+                    ))}
+                  </select>
+                </div>
+
+                {allocateType === 'doctor' ? (
+                  <div className="form-group">
+                    <label>Select Doctor</label>
+                    <select required value={allocateData.doctorId} onChange={e => setAllocateData({ ...allocateData, doctorId: e.target.value })}>
+                      <option value="">-- Choose a Doctor --</option>
+                      {adminDoctors.map(d => (
+                        <option key={d.DOCTOR_ID} value={d.DOCTOR_ID}>Dr. {d.NAME} ({d.SPECIALIST_AREA})</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label>Select Ward</label>
+                    <select required value={allocateData.allocatedWard} onChange={e => setAllocateData({ ...allocateData, allocatedWard: e.target.value })}>
+                      <option value="">-- Choose a Ward --</option>
+                      <option value="Ward A">Ward A</option>
+                      <option value="Ward B">Ward B</option>
+                      <option value="ICU">ICU</option>
+                      <option value="Emergency">Emergency</option>
+                      <option value="Pediatrics">Pediatrics</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Allocation Date</label>
+                    <input type="date" required value={allocateData.allocationDate} onChange={e => setAllocateData({ ...allocateData, allocationDate: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Shift Time</label>
+                    <select required value={allocateData.shiftTime} onChange={e => setAllocateData({ ...allocateData, shiftTime: e.target.value })}>
+                      <option value="">- Select -</option>
+                      <option value="Morning Shift">Morning (08:00 - 16:00)</option>
+                      <option value="Evening Shift">Evening (16:00 - 00:00)</option>
+                      <option value="Night Shift">Night (00:00 - 08:00)</option>
+                      <option value="Full Day">Full Day</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="modal-footer" style={{ marginTop: '2rem' }}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowAllocateModal(false)}>Cancel</button>
+                  <button type="submit" className="btn-primary" disabled={loading}>
+                    {loading ? 'Allocating...' : 'Confirm Allocation'}
+                  </button>
                 </div>
               </form>
             </div>
