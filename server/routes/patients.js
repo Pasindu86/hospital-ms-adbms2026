@@ -164,7 +164,7 @@ router.post('/allocate', authenticateToken, async (req, res) => {
 
 // POST book an appointment
 router.post('/appointment', authenticateToken, async (req, res) => {
-  const { patientId, doctorId, appointmentDate, symptoms, notes } = req.body
+  const { patientId, doctorId, appointmentDate, symptoms, notes, paymentMethod, paymentStatus } = req.body
 
   if (!patientId || !doctorId || !appointmentDate) {
     return res.status(400).json({ error: 'Patient ID, Doctor ID, and Date are required' })
@@ -179,14 +179,16 @@ router.post('/appointment', authenticateToken, async (req, res) => {
 
     await connection.execute(
       `INSERT INTO PATIENT_DOCTOR_APPOINTMENT 
-        (PATIENT_ID, DOCTOR_ID, APPOINTMENT_DATE, NOTES, STATUS)
+        (PATIENT_ID, DOCTOR_ID, APPOINTMENT_DATE, NOTES, STATUS, PAYMENT_METHOD, PAYMENT_STATUS)
        VALUES 
-        (:patientId, :doctorId, :appointmentDate, :notes, 'Scheduled')`,
+        (:patientId, :doctorId, :appointmentDate, :notes, 'Scheduled', :paymentMethod, :paymentStatus)`,
       {
         patientId: parseInt(patientId, 10),
         doctorId: parseInt(doctorId, 10),
         appointmentDate: apptDate,
-        notes: notes || null
+        notes: notes || null,
+        paymentMethod: paymentMethod || 'Cash',
+        paymentStatus: paymentStatus || 'Pending'
       },
       { autoCommit: true }
     )

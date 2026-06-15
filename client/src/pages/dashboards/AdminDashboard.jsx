@@ -106,13 +106,28 @@ const navItems = [
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
+  const [showAllocateModal, setShowAllocateModal] = useState(false);
+  const [allocateType, setAllocateType] = useState('doctor'); // 'doctor' or 'ward'
   const [filterDept, setFilterDept] = useState('all');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [availableNurses, setAvailableNurses] = useState([]);
-  const [formData, setFormData] = useState({ 
-    staffId: '', fullName: '', email: '', password: '', role: 'doctor',
-    mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: []
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [staffList, setStaffList] = useState([]);
+
+  // Staff Selection Data
+  const [adminNurses, setAdminNurses] = useState([]);
+  const [adminDoctors, setAdminDoctors] = useState([]);
+
+  // Registration Form
+  const [formData, setFormData] = useState({
+    fullName: '', email: '', password: '', role: 'doctor',
+    mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: ''
+  });
+
+  // Allocation Form
+  const [allocateData, setAllocateData] = useState({
+    nurseId: '', doctorId: '', allocatedWard: '', allocationDate: '', shiftTime: ''
   });
 
   useEffect(() => {
@@ -126,7 +141,21 @@ export default function AdminDashboard() {
         console.error('Failed to fetch nurses', err);
       }
     };
+
+    const fetchDashboardData = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/admin/dashboard-stats`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        setDashboardStats(res.data.stats);
+        setStaffList(res.data.staffData);
+      } catch (err) {
+        console.error('Failed to fetch dashboard data', err);
+      }
+    };
+
     fetchNurses();
+    fetchDashboardData();
   }, []);
 
   const handleNurseToggle = (nurseId) => {
@@ -138,6 +167,44 @@ export default function AdminDashboard() {
         return { ...prev, nurses: [...current, nurseId] };
       }
     });
+  };
+
+  const openAllocateModal = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
+      const [nursesRes, doctorsRes] = await Promise.all([
+        axios.get(`${API_URL}/admin/nurses`, { headers }),
+        axios.get(`${API_URL}/admin/doctors`, { headers })
+      ]);
+      setAdminNurses(nursesRes.data.nurses || []);
+      setAdminDoctors(doctorsRes.data.doctors || []);
+      setShowAllocateModal(true);
+      setMessage({ type: '', text: '' });
+    } catch (err) {
+      console.error('Failed to load staff for allocation:', err);
+    }
+  };
+
+  const handleAllocateDuty = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+    try {
+      const endpoint = allocateType === 'doctor'
+        ? `${API_URL}/admin/allocate-doctor-duty`
+        : `${API_URL}/admin/allocate-ward-duty`;
+
+      const res = await axios.post(endpoint, allocateData, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setMessage({ type: 'success', text: res.data.message || 'Duty allocated successfully!' });
+      setAllocateData({ nurseId: '', doctorId: '', allocatedWard: '', allocationDate: '', shiftTime: '' });
+      setTimeout(() => setShowAllocateModal(false), 1500);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.error || 'Allocation failed.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogout = () => {
@@ -157,14 +224,14 @@ export default function AdminDashboard() {
       } else if (formData.role === 'nurse') {
         endpoint = `${API_URL}/admin/register-nurse`;
       }
-        
+
       const res = await axios.post(endpoint, formData, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       setMessage({ type: 'success', text: res.data.message || 'Staff registered successfully!' });
-      setFormData({ 
-        staffId: '', fullName: '', email: '', password: '', role: 'doctor',
-        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: []
+      setFormData({
+        fullName: '', email: '', password: '', role: 'doctor',
+        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: ''
       });
       setTimeout(() => setShowModal(false), 1500);
     } catch (err) {
@@ -174,9 +241,54 @@ export default function AdminDashboard() {
     }
   };
 
-  const filteredStaff = filterDept === 'all'
-    ? staffData
-    : staffData.filter(s => s.dept.toLowerCase().includes(filterDept.toLowerCase()));
+  useEffect(() => {
+    if (filterDept !== 'all') {
+      const fetchRoleSpecific = async () => {
+        try {
+          const res = await axios.get(`${API_URL}/admin/staff/${filterDept}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          setStaffList(res.data.staff || []);
+        } catch (err) {
+          console.error('Failed to fetch role specific staff', err);
+        }
+      };
+      fetchRoleSpecific();
+    } else {
+      // Refresh general stats if "all" is selected
+      const fetchDashboardData = async () => {
+        try {
+          const res = await axios.get(`${API_URL}/admin/dashboard-stats`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          setStaffList(res.data.staffData || []);
+        } catch (err) {
+          console.error('Failed to fetch dashboard data', err);
+        }
+      };
+      fetchDashboardData();
+    }
+  }, [filterDept]);
+
+  const filteredStaff = staffList;
+
+  const dynamicStats = dashboardStats ? [
+    {
+      label: 'Total Doctors', value: dashboardStats.TOTAL_DOCTORS || 0, icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.503 4.045 3 5.5L12 21l7-7Z" /><path d="M12 5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2" /><path d="M9 3v2" /><path d="M15 3v2" /><path d="M12 14v4" /><path d="M10 16h4" /></svg>
+      ), color: 'blue', badge: '+4%', badgeColor: 'green'
+    },
+    {
+      label: 'Total Patients', value: dashboardStats.TOTAL_PATIENTS || 0, icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+      ), color: 'purple', badge: '+12%', badgeColor: 'green'
+    },
+    {
+      label: 'Active Appointments', value: dashboardStats.ACTIVE_APPOINTMENTS || 0, icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
+      ), color: 'amber', badge: 'Busy', badgeColor: 'orange'
+    },
+  ] : stats.slice(0, 3);
 
   return (
     <div className="admin-layout">
@@ -246,14 +358,20 @@ export default function AdminDashboard() {
               <h1>Staff Management</h1>
               <p>Oversee hospital personnel and administration roles.</p>
             </div>
-            <button className="btn-primary-add" onClick={() => { setShowModal(true); setMessage({ type: '', text: '' }); }}>
-              ＋ Add New Staff Member
-            </button>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button className="btn-secondary-action" onClick={openAllocateModal}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" x2="19" y1="8" y2="14" /><line x1="16" x2="22" y1="11" y2="11" /></svg>
+                Allocate Duty
+              </button>
+              <button className="btn-primary-add" onClick={() => { setShowModal(true); setMessage({ type: '', text: '' }); }}>
+                ＋ Add New Staff Member
+              </button>
+            </div>
           </div>
 
           {/* Stats Grid */}
           <div className="stat-cards">
-            {stats.map((card, idx) => (
+            {dynamicStats.map((card, idx) => (
               <div className="stat-card" key={idx}>
                 <div className={`stat-icon ${card.color}`}>{card.icon}</div>
                 <div className="stat-info">
@@ -272,11 +390,12 @@ export default function AdminDashboard() {
                 <h2>Staff Overview</h2>
                 <div className="table-card-controls">
                   <select className="filter-select" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
-                    <option value="all">All Departments</option>
-                    <option value="general">General Surgery</option>
-                    <option value="cardiology">Cardiology</option>
-                    <option value="pharmacy">Main Pharmacy</option>
-                    <option value="front">Front Desk</option>
+                    <option value="all">All Roles</option>
+                    <option value="doctor">Doctors</option>
+                    <option value="nurse">Nurses</option>
+                    <option value="pharmacist">Pharmacists</option>
+                    <option value="reception">Receptionists</option>
+                    <option value="admin">Admins</option>
                   </select>
                   <button className="filter-btn">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9v6l4 3v-9L22 3z" /></svg>
@@ -294,29 +413,37 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredStaff.map(s => (
-                    <tr key={s.id}>
+                  {filteredStaff.length > 0 ? filteredStaff.map(s => (
+                    <tr key={s.USER_ID || s.ID}>
                       <td>
                         <div className="staff-user">
-                          <div className={`staff-avatar ${s.avColor}`}>{s.initials}</div>
+                          <div className="staff-avatar av-blue">
+                            {s.FULL_NAME ? s.FULL_NAME.substring(0, 2).toUpperCase() : '??'}
+                          </div>
                           <div>
-                            <div className="staff-name">{s.name}</div>
-                            <div className="staff-role">{s.role}</div>
+                            <div className="staff-name">{s.FULL_NAME}</div>
+                            <div className="staff-role" style={{ textTransform: 'capitalize' }}>{s.ROLE || filterDept}</div>
                           </div>
                         </div>
                       </td>
-                      <td>{s.dept}</td>
-                      <td><span className={`status-badge ${s.status}`}>{s.status.toUpperCase()}</span></td>
+                      <td>{s.SPECIALIST_AREA || s.ALLOCATED_WARD || '—'}</td>
+                      <td>
+                        <span className={`status-badge ${s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'active' : 'deactivated'}`}>
+                          {s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'ACTIVE' : 'DEACTIVATED'}
+                        </span>
+                      </td>
                       <td>
                         <div className="table-actions">
                           <button className="action-link edit">Edit</button>
-                          <button className={`action-link ${s.status === 'active' ? 'deactivate' : 'activate'}`}>
-                            {s.status === 'active' ? 'Deactivate' : 'Activate'}
+                          <button className={`action-link ${s.IS_ACTIVE === 1 ? 'deactivate' : 'activate'}`}>
+                            {s.IS_ACTIVE === 1 ? 'Deactivate' : 'Activate'}
                           </button>
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No staff records found.</td></tr>
+                  )}
                 </tbody>
               </table>
 
@@ -391,11 +518,7 @@ export default function AdminDashboard() {
                 {message.text && <div className={`alert alert-${message.type}`}>{message.text}</div>}
 
                 <div className="modal-form-row">
-                  <div className="form-field">
-                    <label>Staff ID</label>
-                    <input type="text" placeholder="e.g. 0012" value={formData.staffId} onChange={e => setFormData({ ...formData, staffId: e.target.value })} required />
-                  </div>
-                  <div className="form-field">
+                  <div className="form-field full-width" style={{ flex: 1 }}>
                     <label>Role</label>
                     <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })} required>
                       {[
@@ -440,7 +563,8 @@ export default function AdminDashboard() {
                         <input type="text" placeholder="e.g. RN12345" value={formData.licenseNumber} onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })} required />
                       </div>
                     </div>
-                    
+
+
                     <div className="modal-form-row">
                       <div className="form-field">
                         <label>Address</label>
@@ -462,18 +586,47 @@ export default function AdminDashboard() {
                     {formData.role === 'doctor' && (
                       <div className="form-field">
                         <label>Allocate Nurses</label>
-                        <div className="nurse-select-list" style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px' }}>
-                          {availableNurses.map(nurse => (
-                            <label key={nurse.NURSE_ID} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer', fontWeight: 'normal' }}>
-                              <input 
-                                type="checkbox" 
-                                checked={(formData.nurses || []).includes(nurse.NURSE_ID)}
-                                onChange={() => handleNurseToggle(nurse.NURSE_ID)}
-                              />
-                              {nurse.NAME} ({nurse.ALLOCATED_WARD})
-                            </label>
-                          ))}
-                          {availableNurses.length === 0 && <span style={{ color: '#64748b' }}>No nurses available.</span>}
+                        <div className="nurse-select-grid" style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                          gap: '12px',
+                          maxHeight: '220px',
+                          overflowY: 'auto',
+                          padding: '4px'
+                        }}>
+                          {availableNurses.map(nurse => {
+                            const isSelected = (formData.nurses || []).includes(nurse.NURSE_ID);
+                            return (
+                              <div key={nurse.NURSE_ID} onClick={() => handleNurseToggle(nurse.NURSE_ID)}
+                                style={{
+                                  border: `1px solid ${isSelected ? '#3b82f6' : '#e2e8f0'}`,
+                                  backgroundColor: isSelected ? '#eff6ff' : '#fff',
+                                  borderRadius: '8px',
+                                  padding: '12px',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '12px',
+                                  transition: 'all 0.2s',
+                                  boxShadow: isSelected ? '0 2px 4px rgba(59, 130, 246, 0.1)' : 'none'
+                                }}>
+                                <div style={{
+                                  width: '20px', height: '20px', borderRadius: '4px',
+                                  border: `1.5px solid ${isSelected ? '#3b82f6' : '#cbd5e1'}`,
+                                  backgroundColor: isSelected ? '#3b82f6' : '#fff',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  {isSelected && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontWeight: 600, fontSize: '13px', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nurse.NAME}</div>
+                                  <div style={{ fontSize: '11px', color: '#64748b' }}>{nurse.ALLOCATED_WARD || 'General Ward'}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {availableNurses.length === 0 && <span style={{ color: '#64748b', fontStyle: 'italic', padding: '10px' }}>No nurses available.</span>}
                         </div>
                       </div>
                     )}
@@ -483,6 +636,102 @@ export default function AdminDashboard() {
                 <div className="modal-actions" style={{ padding: 0, border: 'none', marginTop: '8px' }}>
                   <button type="button" className="btn-cancel" onClick={() => setShowModal(false)}>Cancel</button>
                   <button type="submit" className="btn-submit" disabled={loading}>{loading ? 'Registering...' : 'Register Staff'}</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Allocate Duty Modal */}
+      {showAllocateModal && (
+        <div className="modal-overlay">
+          <div className="modal-container" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <div>
+                <h2>Allocate Duty</h2>
+                <p>Assign a nurse to a doctor, ward, and shift.</p>
+              </div>
+              <button className="modal-close" onClick={() => setShowAllocateModal(false)}>✕</button>
+            </div>
+
+            <div className="modal-body">
+              {message.text && (
+                <div className={`status-msg ${message.type}`}>
+                  {message.text}
+                </div>
+              )}
+
+              <form onSubmit={handleAllocateDuty}>
+                <div className="form-group" style={{ display: 'flex', gap: '10px', marginBottom: '1.5rem' }}>
+                  <button type="button"
+                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--nurse-primary)', background: allocateType === 'doctor' ? 'var(--nurse-primary)' : 'transparent', color: allocateType === 'doctor' ? 'white' : 'var(--nurse-primary)', fontWeight: 'bold', cursor: 'pointer' }}
+                    onClick={() => setAllocateType('doctor')}>
+                    Assign to Doctor
+                  </button>
+                  <button type="button"
+                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--nurse-primary)', background: allocateType === 'ward' ? 'var(--nurse-primary)' : 'transparent', color: allocateType === 'ward' ? 'white' : 'var(--nurse-primary)', fontWeight: 'bold', cursor: 'pointer' }}
+                    onClick={() => setAllocateType('ward')}>
+                    Assign to Ward
+                  </button>
+                </div>
+
+                <div className="form-group">
+                  <label>Select Nurse</label>
+                  <select required value={allocateData.nurseId} onChange={e => setAllocateData({ ...allocateData, nurseId: e.target.value })}>
+                    <option value="">-- Choose a Nurse --</option>
+                    {adminNurses.map(n => (
+                      <option key={n.NURSE_ID} value={n.NURSE_ID}>{n.NAME} (Ward: {n.ALLOCATED_WARD || 'None'})</option>
+                    ))}
+                  </select>
+                </div>
+
+                {allocateType === 'doctor' ? (
+                  <div className="form-group">
+                    <label>Select Doctor</label>
+                    <select required value={allocateData.doctorId} onChange={e => setAllocateData({ ...allocateData, doctorId: e.target.value })}>
+                      <option value="">-- Choose a Doctor --</option>
+                      {adminDoctors.map(d => (
+                        <option key={d.DOCTOR_ID} value={d.DOCTOR_ID}>Dr. {d.NAME} ({d.SPECIALIST_AREA})</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label>Select Ward</label>
+                    <select required value={allocateData.allocatedWard} onChange={e => setAllocateData({ ...allocateData, allocatedWard: e.target.value })}>
+                      <option value="">-- Choose a Ward --</option>
+                      <option value="Ward A">Ward A</option>
+                      <option value="Ward B">Ward B</option>
+                      <option value="ICU">ICU</option>
+                      <option value="Emergency">Emergency</option>
+                      <option value="Pediatrics">Pediatrics</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Allocation Date</label>
+                    <input type="date" required value={allocateData.allocationDate} onChange={e => setAllocateData({ ...allocateData, allocationDate: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Shift Time</label>
+                    <select required value={allocateData.shiftTime} onChange={e => setAllocateData({ ...allocateData, shiftTime: e.target.value })}>
+                      <option value="">- Select -</option>
+                      <option value="Morning Shift">Morning (08:00 - 16:00)</option>
+                      <option value="Evening Shift">Evening (16:00 - 00:00)</option>
+                      <option value="Night Shift">Night (00:00 - 08:00)</option>
+                      <option value="Full Day">Full Day</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="modal-footer" style={{ marginTop: '2rem' }}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowAllocateModal(false)}>Cancel</button>
+                  <button type="submit" className="btn-primary" disabled={loading}>
+                    {loading ? 'Allocating...' : 'Confirm Allocation'}
+                  </button>
                 </div>
               </form>
             </div>

@@ -52,22 +52,20 @@ router.get('/appointments/today', async (req, res) => {
 
     const result = await connection.execute(
       `SELECT
-         a.APPOINTMENT_ID,
-         a.PATIENT_ID,
+         dp.PATIENT_ID AS APPOINTMENT_ID,
+         dp.PATIENT_ID,
          p.NAME            AS PATIENT_NAME,
          p.PHONE_NUMBER,
          p.GENDER,
          p.DATE_OF_BIRTH,
          p.DISEASE,
-         a.APPOINTMENT_DATE,
-         a.STATUS,
-         a.NOTES,
-         a.SYMPTOMS
-       FROM PATIENT_DOCTOR_APPOINTMENT a
-       JOIN PATIENT p ON a.PATIENT_ID = p.PATIENT_ID
-       WHERE a.DOCTOR_ID = :doctorId
-         AND TRUNC(a.APPOINTMENT_DATE) = TRUNC(SYSDATE)
-       ORDER BY a.APPOINTMENT_DATE ASC`,
+         SYSDATE           AS APPOINTMENT_DATE,
+         'Scheduled'       AS STATUS,
+         ''                AS NOTES,
+         ''                AS SYMPTOMS
+       FROM DOCTOR_PATIENT dp
+       JOIN PATIENT p ON dp.PATIENT_ID = p.PATIENT_ID
+       WHERE dp.DOCTOR_ID = :doctorId`,
       { doctorId }
     )
     res.json({ appointments: result.rows })
@@ -92,15 +90,24 @@ router.get('/patients/search', async (req, res) => {
   let connection
   try {
     connection = await oracledb.getConnection()
+    const doctorId = await getDoctorId(connection, req.user.staffId)
+    if (!doctorId) {
+      return res.status(404).json({ error: 'Doctor profile not found' })
+    }
+
     const result = await connection.execute(
-      `SELECT PATIENT_ID, NAME, EMAIL, PHONE_NUMBER, GENDER, DATE_OF_BIRTH, DISEASE
-       FROM PATIENT
-       WHERE UPPER(NAME) LIKE '%' || UPPER(:q) || '%'
-          OR TO_CHAR(PATIENT_ID) = :q
-          OR PHONE_NUMBER LIKE '%' || :q || '%'
-       ORDER BY NAME ASC
+      `SELECT DISTINCT p.PATIENT_ID, p.NAME, p.EMAIL, p.PHONE_NUMBER, p.GENDER, p.DATE_OF_BIRTH, p.DISEASE
+       FROM PATIENT p
+       JOIN PATIENT_DOCTOR_APPOINTMENT pda ON p.PATIENT_ID = pda.PATIENT_ID
+       WHERE pda.DOCTOR_ID = :doctorId
+         AND (
+           UPPER(p.NAME) LIKE '%' || UPPER(:q) || '%'
+           OR TO_CHAR(p.PATIENT_ID) = :q
+           OR p.PHONE_NUMBER LIKE '%' || :q || '%'
+         )
+       ORDER BY p.NAME ASC
        FETCH FIRST 20 ROWS ONLY`,
-      { q: query }
+      { q: query, doctorId: doctorId }
     )
     res.json({ patients: result.rows })
   } catch (error) {
@@ -228,13 +235,13 @@ router.post('/treatments', async (req, res) => {
 
     // Call PL/SQL procedure
     const bindVars = {
-      p_appointment_id:  appointmentId,
-      p_patient_id:      patientId,
-      p_doctor_id:       doctorId,
-      p_diagnosis:       diagnosis,
+      p_appointment_id: appointmentId,
+      p_patient_id: patientId,
+      p_doctor_id: doctorId,
+      p_diagnosis: diagnosis,
       p_clinical_advice: clinicalAdvice || '',
       p_treatment_notes: treatmentNotes || '',
-      p_record_id:       { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
+      p_record_id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
     }
 
     const result = await connection.execute(

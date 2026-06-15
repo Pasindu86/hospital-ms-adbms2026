@@ -9,7 +9,8 @@ export default function NurseDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [nurseData, setNurseData] = useState(null);
-  const [patients, setPatients] = useState([]);
+  const [wardDetails, setWardDetails] = useState(null);
+  const [appointments, setAppointments] = useState([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -27,13 +28,31 @@ export default function NurseDashboard() {
 
       const headers = { Authorization: `Bearer ${token}` };
 
-      const [nurseRes, patientsRes] = await Promise.all([
+      const [nurseResult, wardResult] = await Promise.allSettled([
         axios.get(`${API_URL}/nurse/me`, { headers }),
-        axios.get(`${API_URL}/nurse/ward/patients`, { headers })
+        axios.get(`${API_URL}/nurse/ward/details`, { headers })
+      ]);
+
+      if (nurseResult.status === 'fulfilled') {
+        setNurseData(nurseResult.value.data);
+      } else {
+        console.error('Failed to fetch nurse profile:', nurseResult.reason);
+        setError('Failed to load nurse profile. ' + (nurseResult.reason?.response?.data?.error || ''));
+      }
+
+      if (wardResult.status === 'fulfilled') {
+        setWardDetails(wardResult.value.data);
+      } else {
+        console.error('Failed to fetch ward details:', wardResult.reason);
+      }
+
+      const [nurseRes, apptsRes] = await Promise.all([
+        axios.get(`${API_URL}/nurse/me`, { headers }),
+        axios.get(`${API_URL}/nurse/appointments`, { headers })
       ]);
 
       setNurseData(nurseRes.data);
-      setPatients(patientsRes.data.patients);
+      setAppointments(apptsRes.data.appointments);
     } catch (err) {
       console.error('Error fetching nurse data:', err);
       setError('Failed to load dashboard data. Please try again later.');
@@ -56,6 +75,7 @@ export default function NurseDashboard() {
 
   const profile = nurseData?.profile || {};
   const allocations = nurseData?.allocations || [];
+  const wardAllocations = nurseData?.wardAllocations || [];
   const primaryDoctor = allocations.length > 0 ? allocations[0] : null;
 
   return (
@@ -133,20 +153,20 @@ export default function NurseDashboard() {
 
           <div className="nurse-stat-card">
             <div className="nurse-stat-icon amber">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
             </div>
             <div className="nurse-stat-info">
-              <span className="nurse-stat-label">Current Shift</span>
-              <span className="nurse-stat-value">{primaryDoctor?.SHIFT_DETAILS || 'General'}</span>
+              <span className="nurse-stat-label">Ward Occupancy</span>
+              <span className="nurse-stat-value">{wardDetails?.patientCount || 0} Patients</span>
             </div>
           </div>
         </div>
 
         <div className="nurse-content-grid">
-          {/* Patients in Ward */}
+          {/* Appointment Queue */}
           <div className="nurse-panel">
             <div className="nurse-panel-header">
-              <h2>Patients in {profile.ALLOCATED_WARD || 'Ward'}</h2>
+              <h2>Today's Appointment Queue</h2>
               <button style={{ color: 'var(--nurse-primary)', background: 'transparent', border: 'none', fontWeight: 600, cursor: 'pointer' }}>View All</button>
             </div>
             <div style={{ overflowX: 'auto' }}>
@@ -155,23 +175,23 @@ export default function NurseDashboard() {
                   <tr>
                     <th>Patient Name</th>
                     <th>ID</th>
-                    <th>Diagnosis</th>
-                    <th>Contact</th>
+                    <th>Diagnosis/Issue</th>
+                    <th>Doctor</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {patients.length > 0 ? patients.map(p => (
-                    <tr key={p.PATIENT_ID}>
-                      <td style={{ fontWeight: 600 }}>{p.NAME}</td>
-                      <td style={{ color: '#64748b' }}>#{p.PATIENT_ID}</td>
-                      <td>{p.DISEASE}</td>
-                      <td>{p.PHONE_NUMBER}</td>
-                      <td><span className="badge-ward">Stable</span></td>
+                  {appointments.length > 0 ? appointments.map(appt => (
+                    <tr key={appt.APPOINTMENT_ID}>
+                      <td style={{ fontWeight: 600 }}>{appt.PATIENT_NAME}</td>
+                      <td style={{ color: '#64748b' }}>#{appt.PATIENT_ID}</td>
+                      <td>{appt.DISEASE}</td>
+                      <td>{appt.DOCTOR_NAME || 'Unassigned'}</td>
+                      <td><span className="badge-ward">{appt.STATUS}</span></td>
                     </tr>
                   )) : (
                     <tr>
-                      <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>No patients found for this ward.</td>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>No appointments scheduled for today.</td>
                     </tr>
                   )}
                 </tbody>
@@ -179,25 +199,78 @@ export default function NurseDashboard() {
             </div>
           </div>
 
-          {/* Dr. Allocation List */}
+          {/* Doctor Allocation List */}
           <div className="nurse-panel">
             <div className="nurse-panel-header">
-              <h2>Doctor Allocations</h2>
+              <h2>My Allocations (Doctors)</h2>
+              <span className="badge-ward" style={{ background: 'var(--nurse-primary-light)', color: 'var(--nurse-primary)' }}>
+                {allocations.length} Shifts
+              </span>
             </div>
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '500px', overflowY: 'auto' }}>
               {allocations.length > 0 ? allocations.map((a, i) => (
-                <div key={i} style={{ padding: '1rem', background: '#f8fafc', borderRadius: '12px', border: '1px solid var(--nurse-border)' }}>
+                <div key={i} style={{ padding: '1rem', background: 'rgba(56, 189, 248, 0.05)', borderRadius: '12px', border: '1px solid var(--nurse-primary)', position: 'relative' }}>
+                  <div style={{ position: 'absolute', top: '1rem', right: '1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--nurse-primary)' }}>
+                    {new Date(a.ALLOCATION_DATE).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <span style={{ fontWeight: 600 }}>{a.NAME}</span>
-                    <span className="badge-ward" style={{ fontSize: '0.7rem' }}>Today</span>
                   </div>
                   <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{a.SPECIALIST_AREA}</div>
                   <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', fontWeight: 500, color: 'var(--nurse-primary)' }}>
-                    {a.SHIFT_DETAILS}
+                    Shift: {a.SHIFT_DETAILS}
                   </div>
                 </div>
               )) : (
                 <div style={{ textAlign: 'center', color: '#64748b', padding: '1rem' }}>No doctors allocated yet.</div>
+              )}
+            </div>
+
+          </div>
+
+          <div className="nurse-panel">
+            <div className="nurse-panel-header">
+              <h2>My Allocations (Wards)</h2>
+              <span className="badge-ward" style={{ background: 'rgba(99, 102, 241, 0.1)', color: 'var(--nurse-secondary)' }}>
+                {wardAllocations.length} Shifts
+              </span>
+            </div>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxHeight: '300px', overflowY: 'auto' }}>
+              {wardAllocations.length > 0 ? wardAllocations.map((w, i) => (
+                <div key={i} style={{ padding: '1rem', background: 'rgba(99, 102, 241, 0.05)', borderRadius: '12px', border: '1px solid var(--nurse-secondary)', position: 'relative' }}>
+                  <div style={{ position: 'absolute', top: '1rem', right: '1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--nurse-secondary)' }}>
+                    {new Date(w.ALLOCATION_DATE).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                    <span style={{ fontWeight: 600 }}>{w.WARD_NAME}</span>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--nurse-text-muted)' }}>
+                    Assigned Ward Shift
+                  </div>
+                  <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', fontWeight: 500, color: 'var(--nurse-secondary)' }}>
+                    Shift: {w.SHIFT_DETAILS}
+                  </div>
+                </div>
+              )) : (
+                <div style={{ textAlign: 'center', color: '#64748b', padding: '1rem' }}>No wards allocated yet.</div>
+              )}
+            </div>
+
+            <div className="nurse-panel-header" style={{ borderTop: '1px solid var(--nurse-border)' }}>
+              <h2>Other On-Duty Nurses</h2>
+            </div>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {wardDetails?.nurses?.length > 0 ? wardDetails.nurses.map((n, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: '#f8fafc', borderRadius: '12px' }}>
+                  <div className="nurse-avatar-circle" style={{ width: '32px', height: '32px', fontSize: '0.8rem' }}>{n.NAME.substring(0, 2).toUpperCase()}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{n.NAME}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{n.LICENSE_NUMBER}</div>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{n.PHONE_NUMBER}</div>
+                </div>
+              )) : (
+                <div style={{ textAlign: 'center', color: '#64748b', padding: '1rem' }}>No other nurses in this ward.</div>
               )}
             </div>
           </div>

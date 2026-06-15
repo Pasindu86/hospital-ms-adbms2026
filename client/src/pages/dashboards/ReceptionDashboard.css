@@ -893,3 +893,69 @@
   font-style: italic;
   font-size: 12px;
 }
+
+/* Payment Breakdown Section */
+.payment-breakdown-section {
+  background: linear-gradient(135deg, #f0f7ff 0%, #e8f4fd 100%);
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 4px;
+}
+
+.payment-breakdown-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e40af;
+  letter-spacing: 0.3px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.payment-breakdown-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.payment-breakdown-fields .form-group label {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.payment-breakdown-fields input {
+  background: white;
+  border-color: #93c5fd !important;
+}
+
+.payment-breakdown-fields input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+}
+
+.payment-breakdown-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #1e40af;
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.payment-total-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #bfdbfe;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.payment-total-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
