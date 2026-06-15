@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './AdminDashboard.css';
@@ -109,7 +109,36 @@ export default function AdminDashboard() {
   const [filterDept, setFilterDept] = useState('all');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-  const [formData, setFormData] = useState({ staffId: '', fullName: '', email: '', password: '', role: 'doctor' });
+  const [availableNurses, setAvailableNurses] = useState([]);
+  const [formData, setFormData] = useState({ 
+    staffId: '', fullName: '', email: '', password: '', role: 'doctor',
+    mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: []
+  });
+
+  useEffect(() => {
+    const fetchNurses = async () => {
+      try {
+        const res = await axios.get(`${API_URL}/admin/nurses`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        setAvailableNurses(res.data.nurses || []);
+      } catch (err) {
+        console.error('Failed to fetch nurses', err);
+      }
+    };
+    fetchNurses();
+  }, []);
+
+  const handleNurseToggle = (nurseId) => {
+    setFormData(prev => {
+      const current = prev.nurses || [];
+      if (current.includes(nurseId)) {
+        return { ...prev, nurses: current.filter(id => id !== nurseId) };
+      } else {
+        return { ...prev, nurses: [...current, nurseId] };
+      }
+    });
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -122,11 +151,21 @@ export default function AdminDashboard() {
     setLoading(true);
     setMessage({ type: '', text: '' });
     try {
-      const res = await axios.post(`${API_URL}/auth/register`, formData, {
+      let endpoint = `${API_URL}/auth/register`;
+      if (formData.role === 'doctor') {
+        endpoint = `${API_URL}/admin/register-doctor`;
+      } else if (formData.role === 'nurse') {
+        endpoint = `${API_URL}/admin/register-nurse`;
+      }
+        
+      const res = await axios.post(endpoint, formData, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       setMessage({ type: 'success', text: res.data.message || 'Staff registered successfully!' });
-      setFormData({ staffId: '', fullName: '', email: '', password: '', role: 'doctor' });
+      setFormData({ 
+        staffId: '', fullName: '', email: '', password: '', role: 'doctor',
+        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: []
+      });
       setTimeout(() => setShowModal(false), 1500);
     } catch (err) {
       setMessage({ type: 'error', text: err.response?.data?.error || 'Registration failed.' });
@@ -381,13 +420,65 @@ export default function AdminDashboard() {
                 <div className="modal-form-row">
                   <div className="form-field">
                     <label>Email Address</label>
-                    <input type="email" placeholder="name@carepulse.local" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                    <input type="email" placeholder="name@carepulse.local" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} required />
                   </div>
                   <div className="form-field">
                     <label>Password</label>
                     <input type="password" placeholder="••••••••" value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} required minLength="6" />
                   </div>
                 </div>
+
+                {(formData.role === 'doctor' || formData.role === 'nurse') && (
+                  <>
+                    <div className="modal-form-row">
+                      <div className="form-field">
+                        <label>Mobile Number</label>
+                        <input type="text" placeholder="e.g. 0712345678" value={formData.mobileNumber} onChange={e => setFormData({ ...formData, mobileNumber: e.target.value })} required />
+                      </div>
+                      <div className="form-field">
+                        <label>License Number</label>
+                        <input type="text" placeholder="e.g. RN12345" value={formData.licenseNumber} onChange={e => setFormData({ ...formData, licenseNumber: e.target.value })} required />
+                      </div>
+                    </div>
+                    
+                    <div className="modal-form-row">
+                      <div className="form-field">
+                        <label>Address</label>
+                        <input type="text" placeholder="e.g. 123 Main St" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} required />
+                      </div>
+                      {formData.role === 'doctor' ? (
+                        <div className="form-field">
+                          <label>Specialist Area</label>
+                          <input type="text" placeholder="e.g. Cardiology" value={formData.specialistArea} onChange={e => setFormData({ ...formData, specialistArea: e.target.value })} required />
+                        </div>
+                      ) : (
+                        <div className="form-field">
+                          <label>Allocated Ward</label>
+                          <input type="text" placeholder="e.g. ICU" value={formData.allocatedWard || ''} onChange={e => setFormData({ ...formData, allocatedWard: e.target.value })} required />
+                        </div>
+                      )}
+                    </div>
+
+                    {formData.role === 'doctor' && (
+                      <div className="form-field">
+                        <label>Allocate Nurses</label>
+                        <div className="nurse-select-list" style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '10px' }}>
+                          {availableNurses.map(nurse => (
+                            <label key={nurse.NURSE_ID} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer', fontWeight: 'normal' }}>
+                              <input 
+                                type="checkbox" 
+                                checked={(formData.nurses || []).includes(nurse.NURSE_ID)}
+                                onChange={() => handleNurseToggle(nurse.NURSE_ID)}
+                              />
+                              {nurse.NAME} ({nurse.ALLOCATED_WARD})
+                            </label>
+                          ))}
+                          {availableNurses.length === 0 && <span style={{ color: '#64748b' }}>No nurses available.</span>}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
 
                 <div className="modal-actions" style={{ padding: 0, border: 'none', marginTop: '8px' }}>
                   <button type="button" className="btn-cancel" onClick={() => setShowModal(false)}>Cancel</button>

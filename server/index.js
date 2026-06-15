@@ -5,6 +5,9 @@ const oracledb = require('oracledb')
 const path = require('path')
 const authRoutes = require('./routes/auth')
 const nurseRoutes = require('./routes/nurse')
+const adminRoutes = require('./routes/admin')
+const doctorRoutes = require('./routes/doctor')
+const patientRoutes = require('./routes/patients')
 
 dotenv.config({ path: '.env.local' })
 
@@ -39,6 +42,9 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes)
 app.use('/api/nurse', nurseRoutes)
+app.use('/api/admin', adminRoutes)
+app.use('/api/doctor', doctorRoutes)
+app.use('/api/patients', patientRoutes)
 
 app.get('/api/users', async (req, res) => {
   let connection

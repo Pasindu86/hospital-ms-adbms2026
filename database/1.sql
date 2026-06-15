@@ -353,7 +353,18 @@ set define off;
 
         p_patient_id := v_new_id;
       END;
-    
+
+/
+
+  CREATE OR REPLACE EDITIONABLE PROCEDURE "ADMIN"."ALLOCATE_DOCTOR_TO_PATIENT" (
+    p_doctor_id IN NUMBER,
+    p_patient_id IN NUMBER
+  ) AS
+  BEGIN
+    DELETE FROM doctor_patient WHERE patient_id = p_patient_id;
+    INSERT INTO doctor_patient (doctor_id, patient_id)
+    VALUES (p_doctor_id, p_patient_id);
+  END;
 
 /
 --------------------------------------------------------
@@ -841,7 +852,7 @@ END PKG_DOCTOR_OPS;
 --------------------------------------------------------
 
   ALTER TABLE "ADMIN"."PATIENT_DOCTOR_APPOINTMENT" ADD CONSTRAINT "FK_PATIENT" FOREIGN KEY ("PATIENT_ID")
-	  REFERENCES "ADMIN"."PATIENT" ("PATIENT_ID") ENABLE;
+	  REFERENCES "ADMIN"."PATIENTS" ("PATIENT_ID") ENABLE;
   ALTER TABLE "ADMIN"."PATIENT_DOCTOR_APPOINTMENT" ADD CONSTRAINT "FK_DOCTOR_APP" FOREIGN KEY ("DOCTOR_ID")
 	  REFERENCES "ADMIN"."DOCTOR" ("DOCTOR_ID") ENABLE;
 --------------------------------------------------------
@@ -862,3 +873,24 @@ END PKG_DOCTOR_OPS;
 	  REFERENCES "ADMIN"."PRESCRIPTION" ("PRESCRIPTION_ID") ENABLE;
   ALTER TABLE "ADMIN"."PRESCRIPTION_ITEM" ADD CONSTRAINT "FK_PI_DRUG" FOREIGN KEY ("DRUG_ID")
 	  REFERENCES "ADMIN"."DRUG_STOCK" ("DRUG_ID") ENABLE;
+
+/
+
+-- Real-world Appointment Booking Procedure
+CREATE OR REPLACE EDITIONABLE PROCEDURE "ADMIN"."BOOK_APPOINTMENT" (
+    p_patient_id     IN NUMBER,
+    p_doctor_id      IN NUMBER,
+    p_appointment_dt IN TIMESTAMP,
+    p_symptoms       IN VARCHAR2,
+    p_notes          IN VARCHAR2
+) AS
+BEGIN
+    INSERT INTO patient_doctor_appointment (patient_id, doctor_id, appointment_date, symptoms, notes, status)
+    VALUES (p_patient_id, p_doctor_id, p_appointment_dt, p_symptoms, p_notes, 'Scheduled');
+    
+    -- Also update/ensure the doctor_patient link for quick lookups
+    DELETE FROM doctor_patient WHERE patient_id = p_patient_id;
+    INSERT INTO doctor_patient (doctor_id, patient_id)
+    VALUES (p_doctor_id, p_patient_id);
+END;
+/
