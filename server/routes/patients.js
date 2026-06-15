@@ -28,12 +28,13 @@ router.get('/doctors', authenticateToken, async (req, res) => {
   try {
     connection = await oracledb.getConnection()
     const result = await connection.execute(
-      `SELECT user_id AS "doctorId", 
-              full_name AS "fullName", 
-              email 
-       FROM user_auth 
-       WHERE role = 'doctor' AND is_active = 1
-       ORDER BY full_name ASC`
+      `SELECT d.doctor_id AS "doctorId", 
+              d.name AS "fullName", 
+              d.email 
+       FROM doctor d
+       JOIN user_auth u ON d.doctor_id = u.user_id
+       WHERE u.is_active = 1
+       ORDER BY d.name ASC`
     )
     res.json(result.rows)
   } catch (error) {
@@ -53,13 +54,13 @@ router.get('/', authenticateToken, async (req, res) => {
     connection = await oracledb.getConnection()
     const result = await connection.execute(
       `SELECT p.patient_id AS "patientId", 
-              p.name, 
-              p.email, 
+              p.name AS "name", 
+              p.email AS "email", 
               p.phone_number AS "phoneNumber", 
-              p.address, 
-              p.disease, 
+              p.address AS "address", 
+              p.disease AS "disease", 
               TO_CHAR(p.date_of_birth, 'YYYY-MM-DD') AS "dob", 
-              p.gender,
+              p.gender AS "gender",
               d.user_id AS "doctorId",
               d.full_name AS "doctorName"
        FROM patients p
@@ -92,7 +93,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
     // Convert dob string to JS Date for Oracle or handle null
     const dobDate = dob ? new Date(dob) : null
-    
+
     // Parse doctorId (could be empty or null)
     const docIdNum = doctorId ? parseInt(doctorId, 10) : null
 
@@ -121,6 +122,95 @@ router.post('/', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('POST /api/patients (PL/SQL) failed', error)
     res.status(500).json({ error: 'Database error saving patient record: ' + error.message })
+  } finally {
+    if (connection) {
+      try { await connection.close() } catch (e) { /* ignore */ }
+    }
+  }
+})
+
+// POST allocate a doctor to a patient
+router.post('/allocate', authenticateToken, async (req, res) => {
+  const { doctorId, patientId } = req.body
+
+  if (!doctorId || !patientId) {
+    return res.status(400).json({ error: 'Doctor ID and Patient ID are required' })
+  }
+
+  let connection
+  try {
+    connection = await oracledb.getConnection()
+    await connection.execute(
+      `BEGIN
+         allocate_doctor_to_patient(:doctorId, :patientId);
+       END;`,
+      {
+        doctorId: parseInt(doctorId, 10),
+        patientId: parseInt(patientId, 10)
+      },
+      { autoCommit: true }
+    )
+
+    res.status(200).json({ message: 'Doctor allocated to patient successfully' })
+  } catch (error) {
+    console.error('POST /api/patients/allocate failed', error)
+    res.status(500).json({ error: 'Database error allocating doctor: ' + error.message })
+  } finally {
+    if (connection) {
+      try { await connection.close() } catch (e) { /* ignore */ }
+    }
+  }
+})
+
+// POST book an appointment
+router.post('/appointment', authenticateToken, async (req, res) => {
+  const { patientId, doctorId, appointmentDate, symptoms, notes } = req.body
+
+  if (!patientId || !doctorId || !appointmentDate) {
+    return res.status(400).json({ error: 'Patient ID, Doctor ID, and Date are required' })
+  }
+
+  let connection
+  try {
+    connection = await oracledb.getConnection()
+
+    // Convert appointmentDate to Date object for Oracle
+    const apptDate = new Date(appointmentDate)
+
+    await connection.execute(
+      `INSERT INTO PATIENT_DOCTOR_APPOINTMENT 
+        (PATIENT_ID, DOCTOR_ID, APPOINTMENT_DATE, NOTES, STATUS)
+       VALUES 
+        (:patientId, :doctorId, :appointmentDate, :notes, 'Scheduled')`,
+      {
+        patientId: parseInt(patientId, 10),
+        doctorId: parseInt(doctorId, 10),
+        appointmentDate: apptDate,
+        notes: notes || null
+      },
+      { autoCommit: true }
+    )
+
+    // Optional: Update doctor_patient link
+    try {
+      await connection.execute(
+        `DELETE FROM doctor_patient WHERE patient_id = :patientId`,
+        { patientId: parseInt(patientId, 10) },
+        { autoCommit: true }
+      )
+      await connection.execute(
+        `INSERT INTO doctor_patient (doctor_id, patient_id) VALUES (:doctorId, :patientId)`,
+        { doctorId: parseInt(doctorId, 10), patientId: parseInt(patientId, 10) },
+        { autoCommit: true }
+      )
+    } catch (linkErr) {
+      console.warn('Failed to update doctor_patient link, continuing...', linkErr)
+    }
+
+    res.status(200).json({ message: 'Appointment booked successfully' })
+  } catch (error) {
+    console.error('POST /api/patients/appointment failed', error)
+    res.status(500).json({ error: 'Database error booking appointment: ' + error.message })
   } finally {
     if (connection) {
       try { await connection.close() } catch (e) { /* ignore */ }

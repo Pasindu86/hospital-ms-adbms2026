@@ -10,6 +10,7 @@ export default function NurseDashboard() {
   const [loading, setLoading] = useState(true);
   const [nurseData, setNurseData] = useState(null);
   const [wardDetails, setWardDetails] = useState(null);
+  const [appointments, setAppointments] = useState([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -45,6 +46,13 @@ export default function NurseDashboard() {
         console.error('Failed to fetch ward details:', wardResult.reason);
       }
 
+      const [nurseRes, apptsRes] = await Promise.all([
+        axios.get(`${API_URL}/nurse/me`, { headers }),
+        axios.get(`${API_URL}/nurse/appointments`, { headers })
+      ]);
+
+      setNurseData(nurseRes.data);
+      setAppointments(apptsRes.data.appointments);
     } catch (err) {
       console.error('Error fetching nurse data:', err);
       setError('Failed to load dashboard data. Please try again later.');
@@ -155,6 +163,41 @@ export default function NurseDashboard() {
         </div>
 
         <div className="nurse-content-grid">
+          {/* Appointment Queue */}
+          <div className="nurse-panel">
+            <div className="nurse-panel-header">
+              <h2>Today's Appointment Queue</h2>
+              <button style={{ color: 'var(--nurse-primary)', background: 'transparent', border: 'none', fontWeight: 600, cursor: 'pointer' }}>View All</button>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="nurse-table">
+                <thead>
+                  <tr>
+                    <th>Patient Name</th>
+                    <th>ID</th>
+                    <th>Diagnosis/Issue</th>
+                    <th>Doctor</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {appointments.length > 0 ? appointments.map(appt => (
+                    <tr key={appt.APPOINTMENT_ID}>
+                      <td style={{ fontWeight: 600 }}>{appt.PATIENT_NAME}</td>
+                      <td style={{ color: '#64748b' }}>#{appt.PATIENT_ID}</td>
+                      <td>{appt.DISEASE}</td>
+                      <td>{appt.DOCTOR_NAME || 'Unassigned'}</td>
+                      <td><span className="badge-ward">{appt.STATUS}</span></td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>No appointments scheduled for today.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           {/* Doctor Allocation List */}
           <div className="nurse-panel">
