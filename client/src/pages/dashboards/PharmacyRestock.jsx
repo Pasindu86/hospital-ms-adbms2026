@@ -6,6 +6,9 @@ import './ReceptionDashboard.css';
 const API_URL = 'http://localhost:5000/api';
 
 export default function PharmacyRestock() {
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const pharmacistName = user?.name || "Pharmacist User";
   const navigate = useNavigate();
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -200,7 +203,7 @@ export default function PharmacyRestock() {
             <div className="user-profile">
               <div className="topbar-avatar">PM</div>
               <div className="user-info">
-                <span className="user-name">Pharmacist User</span>
+                <span className="user-name">{pharmacistName}</span>
                 <span className="user-role">Main Pharmacy</span>
               </div>
             </div>
@@ -301,7 +304,7 @@ export default function PharmacyRestock() {
             }}
           >
             <div className="modal-header">
-              <h3>Add New Batch to Stock</h3>
+              <h3>Add New Stock</h3>
               <button className="modal-close" onClick={() => setIsRestockOpen(false)}>✕</button>
             </div>
             <div className="modal-body">

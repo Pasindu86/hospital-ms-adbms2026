@@ -6,6 +6,9 @@ import './ReceptionDashboard.css';
 const API_URL = 'http://localhost:5000/api';
 
 export default function InventoryDashboard() {
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const pharmacistName = user?.name || "Pharmacist User";
   const navigate = useNavigate();
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -147,7 +150,7 @@ export default function InventoryDashboard() {
             <div className="user-profile">
               <div className="topbar-avatar">PM</div>
               <div className="user-info">
-                <span className="user-name">Pharmacist User</span>
+                <span style={{ fontSize: '14px', fontWeight: '500', color: '#000102ff', display: 'block' }}>{pharmacistName}</span>
                 <span className="user-role">Main Pharmacy</span>
               </div>
             </div>

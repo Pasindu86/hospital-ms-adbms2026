@@ -6,6 +6,9 @@ import './ReceptionDashboard.css';
 const API_URL = 'http://localhost:5000/api';
 
 export default function PharmacyDispense() {
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const pharmacistName = user?.name || "Pharmacist User";
   const navigate = useNavigate();
   const [prescriptions, setPrescriptions] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -292,7 +295,7 @@ export default function PharmacyDispense() {
             <div className="user-profile">
               <div className="topbar-avatar">PM</div>
               <div className="user-info">
-                <span className="user-name">Pharmacist User</span>
+                <span className="user-name">{pharmacistName}</span>
                 <span className="user-role">Main Pharmacy</span>
               </div>
             </div>
