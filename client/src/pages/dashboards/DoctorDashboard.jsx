@@ -97,7 +97,6 @@ export default function DoctorDashboard() {
   const [selectedAppt, setSelectedAppt] = useState(null)
   const [history, setHistory] = useState([])
   const [prescriptionHistory, setPrescriptionHistory] = useState([])
-  const [labReports, setLabReports] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -144,44 +143,33 @@ export default function DoctorDashboard() {
     setMedItems([])
     setMessage({ type: '', text: '' })
 
-    // Fetch history & lab reports
-    try {
-      const [histRes, labRes] = await Promise.all([
-        axios.get(`${API}/patients/${appt.PATIENT_ID}/history`, { headers: getAuthHeaders() }),
-        axios.get(`${API}/patients/${appt.PATIENT_ID}/lab-reports`, { headers: getAuthHeaders() })
-      ])
-      setHistory(histRes.data.records || [])
-      setPrescriptionHistory(histRes.data.prescriptions || [])
-      setLabReports(labRes.data.labReports || [])
-    } catch (err) {
-      console.error('Failed to load patient data', err)
-    }
+    // Fetch history
+    await loadPatientData(appt.PATIENT_ID)
   }
 
-  // Select from search results
+  // Load a patient's records & prescriptions
+  const loadPatientData = async (patientId) => {
+    setLoading(true)
+    try {
+      const histRes = await axios.get(`${API}/patients/${patientId}/history`, { headers: getAuthHeaders() })
+      setHistory(histRes.data.records || [])
+      setPrescriptionHistory(histRes.data.prescriptions || [])
+    } catch (err) {
+      console.error('Failed to load patient data', err)
+      setHistory([])
+      setPrescriptionHistory([])
+    } finally { setLoading(false) }
+  }
+
+  // Select from the top-bar search results — opens read-only history
   const selectSearchPatient = async (patient) => {
     setSelectedPatient({ id: patient.PATIENT_ID, name: patient.NAME, gender: patient.GENDER })
     setSelectedAppt(null)
-    setView('examination')
+    setView('history')
     setSearchResults([])
     setSearchQuery('')
-    setDiagnosis('')
-    setClinicalAdvice('')
-    setTreatmentNotes('')
-    setMedItems([])
     setMessage({ type: '', text: '' })
-
-    try {
-      const [histRes, labRes] = await Promise.all([
-        axios.get(`${API}/patients/${patient.PATIENT_ID}/history`, { headers: getAuthHeaders() }),
-        axios.get(`${API}/patients/${patient.PATIENT_ID}/lab-reports`, { headers: getAuthHeaders() })
-      ])
-      setHistory(histRes.data.records || [])
-      setPrescriptionHistory(histRes.data.prescriptions || [])
-      setLabReports(labRes.data.labReports || [])
-    } catch (err) {
-      console.error('Failed to load patient data', err)
-    }
+    await loadPatientData(patient.PATIENT_ID)
   }
 
   // Prescription builder
@@ -284,8 +272,8 @@ export default function DoctorDashboard() {
           <button className={`nav-item ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>
             <span className="nav-icon">📋</span> Dashboard
           </button>
-          <button className={`nav-item ${view === 'examination' ? 'active' : ''}`} onClick={() => selectedPatient && setView('examination')}>
-            <span className="nav-icon">🩺</span> Examination
+          <button className={`nav-item ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}>
+            <span className="nav-icon">📚</span> Patient History
           </button>
         </nav>
         <div className="sidebar-footer">
@@ -438,67 +426,39 @@ export default function DoctorDashboard() {
                 <p>Patient ID: #{selectedPatient.id}{selectedAppt ? ` · Appointment: ${formatDate(selectedAppt.APPOINTMENT_DATE)}` : ''}</p>
               </div>
 
-              {/* Split Viewer: History + Lab Reports */}
-              <div className="split-viewer">
-                {/* Left — Medical History */}
-                <div className="viewer-panel">
-                  <div className="viewer-panel-header">
-                    <h4>📄 Medical History</h4>
-                  </div>
-                  <div className="viewer-panel-body">
-                    {history.length === 0 ? (
-                      <div className="no-selection-msg">
-                        <div className="msg-icon">📋</div>
-                        <p>No previous medical records found.</p>
-                      </div>
-                    ) : (
-                      history.map(r => (
-                        <div key={r.RECORD_ID} className="record-item">
-                          <div className="record-date">{formatDate(r.RECORD_DATE)}</div>
-                          <div className="record-diagnosis">{r.DIAGNOSIS}</div>
-                          <div className="record-notes">{r.TREATMENT_NOTES}</div>
-                          {r.CLINICAL_ADVICE && <div className="record-notes" style={{ marginTop: 4, fontStyle: 'italic' }}>Advice: {r.CLINICAL_ADVICE}</div>}
-                          <div className="record-doctor">Dr. {r.DOCTOR_NAME} — {r.SPECIALIST_AREA}</div>
-                          {/* Show prescriptions for this record */}
-                          {prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID).length > 0 && (
-                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
-                              <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>PRESCRIBED:</div>
-                              {prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID).map(p => (
-                                <div key={p.ITEM_ID} style={{ fontSize: 12, color: '#475569', marginBottom: 2 }}>
-                                  💊 {p.DRUG_NAME} — {p.DOSAGE} · {p.DURATION}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
+              {/* Medical History */}
+              <div className="viewer-panel" style={{ marginBottom: 24 }}>
+                <div className="viewer-panel-header">
+                  <h4>📄 Medical History</h4>
                 </div>
-
-                {/* Right — Lab Reports */}
-                <div className="viewer-panel">
-                  <div className="viewer-panel-header">
-                    <h4>🧪 Lab Reports</h4>
-                  </div>
-                  <div className="viewer-panel-body">
-                    {labReports.length === 0 ? (
-                      <div className="no-selection-msg">
-                        <div className="msg-icon">🧪</div>
-                        <p>No lab reports available.</p>
-                      </div>
-                    ) : (
-                      labReports.map(lr => (
-                        <div key={lr.REPORT_ID} className="lab-item">
-                          <div>
-                            <div className="lab-test-name">{lr.TEST_NAME}</div>
-                            <div className="lab-date">{formatDate(lr.REPORT_DATE)}{lr.DOCTOR_NAME ? ` · Dr. ${lr.DOCTOR_NAME}` : ''}</div>
+                <div className="viewer-panel-body">
+                  {history.length === 0 ? (
+                    <div className="no-selection-msg">
+                      <div className="msg-icon">📋</div>
+                      <p>No previous medical records found.</p>
+                    </div>
+                  ) : (
+                    history.map(r => (
+                      <div key={r.RECORD_ID} className="record-item">
+                        <div className="record-date">{formatDate(r.RECORD_DATE)}</div>
+                        <div className="record-diagnosis">{r.DIAGNOSIS}</div>
+                        <div className="record-notes">{r.TREATMENT_NOTES}</div>
+                        {r.CLINICAL_ADVICE && <div className="record-notes" style={{ marginTop: 4, fontStyle: 'italic' }}>Advice: {r.CLINICAL_ADVICE}</div>}
+                        <div className="record-doctor">Dr. {r.DOCTOR_NAME} — {r.SPECIALIST_AREA}</div>
+                        {/* Show prescriptions for this record */}
+                        {prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID).length > 0 && (
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>PRESCRIBED:</div>
+                            {prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID).map(p => (
+                              <div key={p.ITEM_ID} style={{ fontSize: 12, color: '#475569', marginBottom: 2 }}>
+                                💊 {p.DRUG_NAME} — {p.DOSAGE} · {p.DURATION}
+                              </div>
+                            ))}
                           </div>
-                          <span className={`lab-status ${(lr.STATUS || '').toLowerCase()}`}>{lr.STATUS}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -613,6 +573,90 @@ export default function DoctorDashboard() {
                   ← Back to Dashboard
                 </button>
               </div>
+            </>
+          )}
+
+          {/* ─── PATIENT HISTORY VIEW ─────────────────── */}
+          {view === 'history' && (
+            <>
+              <div className="page-title-section">
+                <h1>Patient Medical History</h1>
+                <p>Search a patient above to review their previous treatment records, advice and prescribed medicines.</p>
+              </div>
+
+              {!selectedPatient ? (
+                <div className="doc-card">
+                  <div className="doc-card-body">
+                    <div className="empty-state">
+                      <div className="empty-icon">🔍</div>
+                      <p>Use the search bar at the top to find a patient by name, ID or phone number.</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="doc-card" style={{ marginBottom: 16 }}>
+                    <div className="doc-card-body">
+                      <div className="patient-cell">
+                        <div className={`patient-avatar ${(selectedPatient.gender || 'other').toLowerCase()}`}>
+                          {getInitials(selectedPatient.name)}
+                        </div>
+                        <div className="patient-details">
+                          <div className="p-name">{selectedPatient.name}</div>
+                          <div className="p-id">ID: #{selectedPatient.id}{selectedPatient.gender ? ` · ${selectedPatient.gender}` : ''}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {loading ? (
+                    <div className="loading-container"><div className="spinner"></div><p>Loading patient records...</p></div>
+                  ) : (
+                    <div className="viewer-panel">
+                      <div className="viewer-panel-header">
+                        <h4>📄 Medical History — Treatment, Advice & Medicines</h4>
+                      </div>
+                      <div className="viewer-panel-body">
+                        {history.length === 0 ? (
+                          <div className="no-selection-msg">
+                            <div className="msg-icon">📋</div>
+                            <p>No previous medical records found.</p>
+                          </div>
+                        ) : (
+                          history.map(r => (
+                            <div key={r.RECORD_ID} className="record-item">
+                              <div className="record-date">{formatDate(r.RECORD_DATE)}</div>
+                              <div className="record-diagnosis">Diagnosis: {r.DIAGNOSIS}</div>
+                              {r.TREATMENT_NOTES && (
+                                <div className="record-notes" style={{ marginTop: 4 }}>
+                                  <strong>Treatment:</strong> {r.TREATMENT_NOTES}
+                                </div>
+                              )}
+                              {r.CLINICAL_ADVICE && (
+                                <div className="record-notes" style={{ marginTop: 4, fontStyle: 'italic' }}>
+                                  <strong>Advice:</strong> {r.CLINICAL_ADVICE}
+                                </div>
+                              )}
+                              <div className="record-doctor">Dr. {r.DOCTOR_NAME} — {r.SPECIALIST_AREA}</div>
+                              {/* Prescribed medicines for this record */}
+                              {prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID).length > 0 && (
+                                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>PRESCRIBED MEDICINES:</div>
+                                  {prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID).map(p => (
+                                    <div key={p.ITEM_ID} style={{ fontSize: 12, color: '#475569', marginBottom: 2 }}>
+                                      💊 {p.DRUG_NAME} — {p.DOSAGE} · {p.DURATION}{p.INSTRUCTIONS ? ` · ${p.INSTRUCTIONS}` : ''}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </>
           )}
         </div>
