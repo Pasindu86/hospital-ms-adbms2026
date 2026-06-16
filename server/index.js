@@ -47,6 +47,7 @@ app.use('/api/admin', adminRoutes)
 app.use('/api/doctor', doctorRoutes)
 app.use('/api/pharmacist', pharmacistRoutes)
 app.use('/api/patients', patientRoutes)
+app.use("/api/pharmacy", require("./routes/pharmacyRoutes"));
 
 app.get('/api/users', async (req, res) => {
   let connection
