@@ -42,6 +42,25 @@ export default function PharmacyOverview() {
   const [billingItems, setBillingItems] = useState([]);
   const [currentBillItem, setCurrentBillItem] = useState({ drugId: '', quantity: 1 });
 
+  // Safe user parsing from localStorage
+  let user = { name: 'Pharmacist User', role: 'Main Pharmacy' };
+  try {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      user = JSON.parse(userStr);
+    }
+  } catch (e) {
+    console.error('Failed to parse user from localStorage', e);
+  }
+  const pharmacyUserName = user.name || 'Pharmacist User';
+  const pharmacyUserRole = user.role || 'Main Pharmacy';
+  const userInitials = pharmacyUserName
+    .split(' ')
+    .map(part => part.charAt(0))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -383,27 +402,25 @@ export default function PharmacyOverview() {
             </button>
           ))}
           <button
-            className="sidebar-nav-item active"
-            onClick={() => setShowBillingModal(true)}
-            style={{
-              marginTop: '8px',
-              backgroundColor: '#1d4ed8',
-              color: '#ffffff'
-            }}
+            className="sidebar-nav-item"
+            onClick={handleOpenAddDrugModal}
           >
             <span className="nav-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-9" /><path d="M14 17H5" /><circle cx="17" cy="17" r="3" /><circle cx="7" cy="7" r="3" /></svg>
             </span>
-            <span className="nav-label">New Dispense & Billing</span>
+            <span className="nav-label">Stock Control</span>
+          </button>
+          <button
+            className="sidebar-nav-item"
+            onClick={() => setShowBillingModal(true)}
+          >
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M8 11h8" /><path d="M8 15h6" /></svg>
+            </span>
+            <span className="nav-label">Bill &amp; Dispense</span>
           </button>
         </nav>
         <div className="sidebar-bottom">
-          <button className="sidebar-bottom-item">
-            <span className="nav-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>
-            </span>
-            Help Center
-          </button>
           <button className="sidebar-bottom-item logout" onClick={handleLogout}>
             <span className="nav-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
@@ -430,10 +447,10 @@ export default function PharmacyOverview() {
           <div className="topbar-right">
             <div className="topbar-divider"></div>
             <div className="user-profile">
-              <div className="topbar-avatar">PM</div>
+              <div className="topbar-avatar">{userInitials}</div>
               <div className="user-info">
-                <span className="user-name">Pharmacist User</span>
-                <span className="user-role">Main Pharmacy</span>
+                <span className="user-name">{pharmacyUserName}</span>
+                <span className="user-role">{pharmacyUserRole}</span>
               </div>
             </div>
           </div>
@@ -447,11 +464,18 @@ export default function PharmacyOverview() {
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
               <button
-                className="btn-primary-add"
-                onClick={handleOpenAddDrugModal}
-                style={{ backgroundColor: '#1d4ed8', border: 'none', color: '#fff', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
+                className="pharmacy-quick-btn success"
+                onClick={() => setShowBillingModal(true)}
               >
-                ＋ Add New Medicine
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M8 11h8" /><path d="M8 15h6" /></svg>
+                Create Bill
+              </button>
+              <button
+                className="pharmacy-quick-btn primary"
+                onClick={handleOpenAddDrugModal}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+                Add New Medicine
               </button>
             </div>
           </div>
