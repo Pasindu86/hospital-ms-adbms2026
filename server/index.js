@@ -32,7 +32,9 @@ if (!DB_USER || !DB_PASSWORD || !DB_CONNECT_STRING) {
 }
 
 oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT
-
+// Return CLOB columns (e.g. MEDICAL_RECORD.CLINICAL_ADVICE) as plain strings
+// instead of Lob stream objects, so they serialize correctly in res.json().
+oracledb.fetchAsString = [oracledb.CLOB]
 const app = express()
 app.use(cors())
 app.use(express.json())
