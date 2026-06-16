@@ -107,6 +107,8 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [showAllocateModal, setShowAllocateModal] = useState(false);
+  const [showFeeModal, setShowFeeModal] = useState(false);
+  const [feeData, setFeeData] = useState({ doctorId: '', name: '', consultationFee: 0, hospitalCharge: 500 });
   const [allocateType, setAllocateType] = useState('doctor'); // 'doctor' or 'ward'
   const [filterDept, setFilterDept] = useState('all');
   const [loading, setLoading] = useState(false);
@@ -122,7 +124,7 @@ export default function AdminDashboard() {
   // Registration Form
   const [formData, setFormData] = useState({
     fullName: '', email: '', password: '', role: 'doctor',
-    mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: ''
+    mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: '', consultationFee: 0, hospitalCharge: 500
   });
 
   // Allocation Form
@@ -231,7 +233,7 @@ export default function AdminDashboard() {
       setMessage({ type: 'success', text: res.data.message || 'Staff registered successfully!' });
       setFormData({
         fullName: '', email: '', password: '', role: 'doctor',
-        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: ''
+        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: '', consultationFee: '', hospitalCharge: 500
       });
       setTimeout(() => setShowModal(false), 1500);
     } catch (err) {
@@ -426,7 +428,7 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                       </td>
-                      <td>{s.SPECIALIST_AREA || s.ALLOCATED_WARD || '—'}</td>
+                      <td>{s.SPECIALIST_AREA || s.ALLOCATED_WARD || '—'} {s.ROLE === 'doctor' && s.CONSULTATION_FEE !== undefined && `(Rs ${s.CONSULTATION_FEE})`}</td>
                       <td>
                         <span className={`status-badge ${s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'active' : 'deactivated'}`}>
                           {s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'ACTIVE' : 'DEACTIVATED'}
@@ -434,7 +436,12 @@ export default function AdminDashboard() {
                       </td>
                       <td>
                         <div className="table-actions">
-                          <button className="action-link edit">Edit</button>
+                          <button className="action-link edit" onClick={() => {
+                            if (s.ROLE === 'doctor' || s.ROLE === undefined && s.SPECIALIST_AREA) {
+                              setFeeData({ doctorId: s.USER_ID || s.ID, name: s.FULL_NAME, consultationFee: s.CONSULTATION_FEE || 0, hospitalCharge: s.HOSPITAL_CHARGE || 500 });
+                              setShowFeeModal(true);
+                            }
+                          }}>{s.ROLE === 'doctor' || (s.ROLE === undefined && s.SPECIALIST_AREA) ? 'Set Fee' : 'Edit'}</button>
                           <button className={`action-link ${s.IS_ACTIVE === 1 ? 'deactivate' : 'activate'}`}>
                             {s.IS_ACTIVE === 1 ? 'Deactivate' : 'Activate'}
                           </button>
@@ -584,6 +591,19 @@ export default function AdminDashboard() {
                     </div>
 
                     {formData.role === 'doctor' && (
+                      <div className="modal-form-row">
+                        <div className="form-field" style={{ flex: 1 }}>
+                          <label>Consultation Fee (Rs.)</label>
+                          <input type="number" placeholder="e.g. 1500" value={formData.consultationFee} onChange={e => setFormData({ ...formData, consultationFee: e.target.value })} />
+                        </div>
+                        <div className="form-field" style={{ flex: 1 }}>
+                          <label>Hospital Charge (Rs.)</label>
+                          <input type="number" placeholder="e.g. 500" value={formData.hospitalCharge} onChange={e => setFormData({ ...formData, hospitalCharge: e.target.value })} />
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.role === 'doctor' && (
                       <div className="form-field">
                         <label>Allocate Nurses</label>
                         <div className="nurse-select-grid" style={{
@@ -731,6 +751,60 @@ export default function AdminDashboard() {
                   <button type="button" className="btn-secondary" onClick={() => setShowAllocateModal(false)}>Cancel</button>
                   <button type="submit" className="btn-primary" disabled={loading}>
                     {loading ? 'Allocating...' : 'Confirm Allocation'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set Fee Modal */}
+      {showFeeModal && (
+        <div className="modal-overlay">
+          <div className="modal-container" style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <div>
+                <h2>Set Doctor Fee</h2>
+                <p>Update consultation fee for {feeData.name}.</p>
+              </div>
+              <button className="modal-close" onClick={() => setShowFeeModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                try {
+                  await axios.put(`${API_URL}/admin/doctors/${feeData.doctorId}/fee`, { consultationFee: feeData.consultationFee, hospitalCharge: feeData.hospitalCharge }, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                  });
+                  setShowFeeModal(false);
+
+                  // Simple state update instead of refresh
+                  setStaffList(prev => prev.map(s => {
+                    if (s.USER_ID === feeData.doctorId || s.ID === feeData.doctorId) {
+                      return { ...s, CONSULTATION_FEE: feeData.consultationFee, HOSPITAL_CHARGE: feeData.hospitalCharge };
+                    }
+                    return s;
+                  }));
+                } catch (err) {
+                  console.error('Failed to update fee', err);
+                } finally {
+                  setLoading(false);
+                }
+              }}>
+                <div className="form-group">
+                  <label>Consultation Fee (Rs.)</label>
+                  <input type="number" required value={feeData.consultationFee} onChange={e => setFeeData({ ...feeData, consultationFee: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Hospital Charge (Rs.)</label>
+                  <input type="number" required value={feeData.hospitalCharge} onChange={e => setFeeData({ ...feeData, hospitalCharge: e.target.value })} />
+                </div>
+                <div className="modal-footer" style={{ marginTop: '2rem' }}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowFeeModal(false)}>Cancel</button>
+                  <button type="submit" className="btn-primary" disabled={loading}>
+                    {loading ? 'Saving...' : 'Save Fee'}
                   </button>
                 </div>
               </form>

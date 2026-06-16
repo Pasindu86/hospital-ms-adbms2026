@@ -48,7 +48,7 @@ router.get('/nurses', verifyAdmin, async (req, res) => {
 router.post('/register-doctor', verifyAdmin, async (req, res) => {
     const {
         fullName, email, password, role,
-        mobileNumber, address, licenseNumber, specialistArea, nurses
+        mobileNumber, address, licenseNumber, specialistArea, nurses, consultationFee
     } = req.body;
 
     if (role !== 'doctor') {
@@ -87,6 +87,8 @@ router.post('/register-doctor', verifyAdmin, async (req, res) => {
                     p_nurse_ids_csv => :nurseIdsCsv,
                     p_user_id => :outUserId
                 );
+                
+                UPDATE doctor SET consultation_fee = :consultationFee, hospital_charge = :hospitalCharge WHERE doctor_id = :outUserId;
             END;`,
             {
                 staffId: generatedStaffId,
@@ -98,6 +100,8 @@ router.post('/register-doctor', verifyAdmin, async (req, res) => {
                 mobileNumber: mobileNumber || '',
                 specialistArea: specialistArea || '',
                 nurseIdsCsv: nurseIdsCsv,
+                consultationFee: req.body.consultationFee || 0,
+                hospitalCharge: req.body.hospitalCharge || 500,
                 outUserId: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
             },
             { autoCommit: true }
@@ -196,12 +200,34 @@ router.get('/doctors', verifyAdmin, async (req, res) => {
     try {
         connection = await oracledb.getConnection();
         const result = await connection.execute(
-            `SELECT doctor_id, name, specialist_area FROM doctor ORDER BY name ASC`
+            `SELECT doctor_id, name, specialist_area, consultation_fee, hospital_charge FROM doctor ORDER BY name ASC`
         );
         res.json({ doctors: result.rows });
     } catch (error) {
         console.error('GET /api/admin/doctors failed', error);
         res.status(500).json({ error: 'Failed to fetch doctors' });
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { /* ignore */ }
+        }
+    }
+});
+
+// NEW: Update doctor fee
+router.put('/doctors/:id/fee', verifyAdmin, async (req, res) => {
+    const { consultationFee, hospitalCharge } = req.body;
+    let connection;
+    try {
+        connection = await oracledb.getConnection();
+        await connection.execute(
+            `UPDATE doctor SET consultation_fee = :fee, hospital_charge = :hospitalCharge WHERE doctor_id = :id`,
+            { fee: consultationFee || 0, hospitalCharge: hospitalCharge || 500, id: req.params.id },
+            { autoCommit: true }
+        );
+        res.json({ message: 'Consultation fee updated successfully' });
+    } catch (error) {
+        console.error('PUT /api/admin/doctors/:id/fee failed', error);
+        res.status(500).json({ error: 'Failed to update consultation fee' });
     } finally {
         if (connection) {
             try { await connection.close(); } catch (e) { /* ignore */ }
@@ -355,22 +381,22 @@ router.get('/staff/:role', verifyAdmin, async (req, res) => {
                 IF :role = 'doctor' THEN
                     OPEN c_staff FOR 
                         SELECT u.user_id, u.staff_id, u.full_name, u.email, u.role, u.is_active,
-                               d.license_number, d.specialist_area AS specialized_info
+                               d.license_number, d.specialist_area AS specialized_info, d.consultation_fee, d.hospital_charge
                         FROM user_auth u JOIN doctor d ON u.user_id = d.doctor_id WHERE u.role = 'doctor';
                 ELSIF :role = 'nurse' THEN
                     OPEN c_staff FOR
                         SELECT u.user_id, u.staff_id, u.full_name, u.email, u.role, u.is_active,
-                               n.license_number, n.allocated_ward AS specialized_info
+                               n.license_number, n.allocated_ward AS specialized_info, NULL AS consultation_fee
                         FROM user_auth u JOIN nurse n ON u.user_id = n.nurse_id WHERE u.role = 'nurse';
                 ELSIF :role = 'pharmacist' THEN
                     OPEN c_staff FOR
                         SELECT u.user_id, u.staff_id, u.full_name, u.email, u.role, u.is_active,
-                               p.license_number, NULL AS specialized_info
+                               p.license_number, NULL AS specialized_info, NULL AS consultation_fee
                         FROM user_auth u JOIN pharmaceutical p ON u.user_id = p.pharmaceutical_id WHERE u.role = 'pharmacist';
                 ELSE
                     OPEN c_staff FOR
                         SELECT user_id, staff_id, full_name, email, role, is_active,
-                               NULL AS license_number, NULL AS specialized_info
+                               NULL AS license_number, NULL AS specialized_info, NULL AS consultation_fee, NULL as hospital_charge
                         FROM user_auth WHERE role = :role;
                 END IF;
                 :out_cursor := c_staff;
@@ -396,7 +422,9 @@ router.get('/staff/:role', verifyAdmin, async (req, res) => {
                 LICENSE_NUMBER: row.LICENSE_NUMBER,
                 // Map the specialized info dynamically to the common fields AdminDashboard uses
                 SPECIALIST_AREA: role === 'doctor' ? row.SPECIALIZED_INFO : undefined,
-                ALLOCATED_WARD: role === 'nurse' ? row.SPECIALIZED_INFO : undefined
+                ALLOCATED_WARD: role === 'nurse' ? row.SPECIALIZED_INFO : undefined,
+                CONSULTATION_FEE: row.CONSULTATION_FEE,
+                HOSPITAL_CHARGE: row.HOSPITAL_CHARGE
             });
         }
         await cursor.close();

@@ -30,7 +30,9 @@ router.get('/doctors', authenticateToken, async (req, res) => {
     const result = await connection.execute(
       `SELECT d.doctor_id AS "doctorId", 
               d.name AS "fullName", 
-              d.email 
+              d.email,
+              d.consultation_fee AS "consultationFee",
+              d.hospital_charge AS "hospitalCharge"
        FROM doctor d
        JOIN user_auth u ON d.doctor_id = u.user_id
        WHERE u.is_active = 1
@@ -164,7 +166,7 @@ router.post('/allocate', authenticateToken, async (req, res) => {
 
 // POST book an appointment
 router.post('/appointment', authenticateToken, async (req, res) => {
-  const { patientId, doctorId, appointmentDate, symptoms, notes, paymentMethod, paymentStatus } = req.body
+  const { patientId, doctorId, appointmentDate, symptoms, notes, paymentMethod, paymentStatus, doctorCharges, hospitalCharges } = req.body
 
   if (!patientId || !doctorId || !appointmentDate) {
     return res.status(400).json({ error: 'Patient ID, Doctor ID, and Date are required' })
@@ -174,21 +176,37 @@ router.post('/appointment', authenticateToken, async (req, res) => {
   try {
     connection = await oracledb.getConnection()
 
-    // Convert appointmentDate to Date object for Oracle
     const apptDate = new Date(appointmentDate)
 
     await connection.execute(
-      `INSERT INTO PATIENT_DOCTOR_APPOINTMENT 
-        (PATIENT_ID, DOCTOR_ID, APPOINTMENT_DATE, NOTES, STATUS, PAYMENT_METHOD, PAYMENT_STATUS)
-       VALUES 
-        (:patientId, :doctorId, :appointmentDate, :notes, 'Scheduled', :paymentMethod, :paymentStatus)`,
+      `DECLARE
+         v_patient_name VARCHAR2(100);
+         v_doctor_name VARCHAR2(100);
+         v_payment_id NUMBER;
+       BEGIN
+         SELECT name INTO v_patient_name FROM patients WHERE patient_id = :patientId;
+         SELECT name INTO v_doctor_name FROM doctor WHERE doctor_id = :doctorId;
+         
+         INSERT INTO PATIENT_DOCTOR_APPOINTMENT 
+          (PATIENT_ID, DOCTOR_ID, APPOINTMENT_DATE, NOTES, STATUS, PAYMENT_METHOD, PAYMENT_STATUS)
+         VALUES 
+          (:patientId, :doctorId, :appointmentDate, :notes, 'Scheduled', :paymentMethod, :paymentStatus);
+          
+         SAVE_BOOKING_PAYMENT(
+            :patientId, :doctorId, v_patient_name, v_doctor_name, 
+            :appointmentDate, :doctorCharges, :hospitalCharges, 
+            :paymentMethod, :paymentStatus, v_payment_id
+         );
+       END;`,
       {
         patientId: parseInt(patientId, 10),
         doctorId: parseInt(doctorId, 10),
         appointmentDate: apptDate,
         notes: notes || null,
         paymentMethod: paymentMethod || 'Cash',
-        paymentStatus: paymentStatus || 'Pending'
+        paymentStatus: paymentStatus || 'Pending',
+        doctorCharges: parseFloat(doctorCharges) || 0,
+        hospitalCharges: parseFloat(hospitalCharges) || 500
       },
       { autoCommit: true }
     )
@@ -196,8 +214,8 @@ router.post('/appointment', authenticateToken, async (req, res) => {
     // Optional: Update doctor_patient link
     try {
       await connection.execute(
-        `DELETE FROM doctor_patient WHERE patient_id = :patientId`,
-        { patientId: parseInt(patientId, 10) },
+        `DELETE FROM doctor_patient WHERE patient_id = :patientId AND doctor_id = :doctorId`,
+        { patientId: parseInt(patientId, 10), doctorId: parseInt(doctorId, 10) },
         { autoCommit: true }
       )
       await connection.execute(
