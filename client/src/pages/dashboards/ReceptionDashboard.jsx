@@ -149,14 +149,17 @@ export default function ReceptionDashboard() {
     }
   }
 
-  const allocationSearchResults = patientSearch.trim() ? patients.filter(p =>
+  // Deduplicate patients by patientId
+  const uniquePatients = Array.from(new Map(patients.map(p => [p.patientId, p])).values())
+
+  const allocationSearchResults = patientSearch.trim() ? uniquePatients.filter(p =>
     (p.name || '').toLowerCase().includes(patientSearch.toLowerCase()) ||
     (p.patientId || '').toString().includes(patientSearch) ||
     (p.email || '').toLowerCase().includes(patientSearch.toLowerCase()) ||
     (p.phoneNumber || '').includes(patientSearch)
   ).slice(0, 10) : []
 
-  const directoryResults = patients.filter(p => {
+  const directoryResults = uniquePatients.filter(p => {
     const term = searchTerm.toLowerCase()
     return (p.name || '').toLowerCase().includes(term) || (p.patientId || '').toString().includes(term)
   })
@@ -305,9 +308,21 @@ export default function ReceptionDashboard() {
 
                     <div className="form-group">
                       <label>Select Physician</label>
-                      <select value={apptData.doctorId} onChange={(e) => setApptData({ ...apptData, doctorId: e.target.value })} required>
+                      <select
+                        value={apptData.doctorId}
+                        onChange={(e) => {
+                          const id = e.target.value;
+                          const doc = doctors.find(d => String(d.doctorId) === String(id));
+                          setApptData({
+                            ...apptData,
+                            doctorId: id,
+                            doctorCharges: doc ? doc.consultationFee : '',
+                            hospitalCharges: doc && doc.hospitalCharge ? doc.hospitalCharge : (id ? '500' : '')
+                          });
+                        }}
+                        required>
                         <option value="">-- Choose available doctor --</option>
-                        {doctors.map(d => <option key={d.doctorId} value={d.doctorId}>Dr. {d.fullName}</option>)}
+                        {doctors.map(d => <option key={d.doctorId} value={d.doctorId}>Dr. {d.fullName} (Fee: Rs {d.consultationFee || 0})</option>)}
                       </select>
                     </div>
 
@@ -328,22 +343,20 @@ export default function ReceptionDashboard() {
                           <label>Doctor Charges (Rs.)</label>
                           <input
                             type="number"
-                            min="0"
-                            step="0.01"
                             value={apptData.doctorCharges}
-                            onChange={(e) => setApptData({ ...apptData, doctorCharges: e.target.value })}
-                            placeholder="e.g. 1500.00"
+                            readOnly
+                            style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                            placeholder="Select doctor to view"
                           />
                         </div>
                         <div className="form-group">
                           <label>Hospital Charges (Rs.)</label>
                           <input
                             type="number"
-                            min="0"
-                            step="0.01"
                             value={apptData.hospitalCharges}
-                            onChange={(e) => setApptData({ ...apptData, hospitalCharges: e.target.value })}
-                            placeholder="e.g. 500.00"
+                            readOnly
+                            style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
+                            placeholder="Select doctor to view"
                           />
                         </div>
                       </div>
