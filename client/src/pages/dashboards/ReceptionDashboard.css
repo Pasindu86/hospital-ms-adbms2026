@@ -958,4 +958,210 @@
   font-weight: 800;
   color: #ffffff;
   letter-spacing: 0.5px;
+}
+
+/* ===== Pharmacy dashboard shared classes ===== */
+
+/* Topbar profile */
+.topbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.2;
+}
+
+.user-role {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Stat card color variants */
+.stat-icon.red {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.stat-icon.amber {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.stat-badge.red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.stat-badge.orange {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+/* Inventory table */
+.staff-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.staff-table th {
+  padding: 12px 24px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-light);
+  text-transform: uppercase;
+  background: #fafbfc;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.staff-table td {
+  padding: 14px 24px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13.5px;
+  color: #475569;
+  vertical-align: middle;
+}
+
+.staff-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 50px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-badge.active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.deactivated {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Right column + side cards */
+.right-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.side-card-body {
+  padding: 20px 24px;
+}
+
+.dept-load-item {
+  margin-bottom: 18px;
+}
+
+.dept-load-item:last-child {
+  margin-bottom: 0;
+}
+
+.dept-load-top {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.dept-load-bar {
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 50px;
+  overflow: hidden;
+}
+
+.dept-load-fill {
+  height: 100%;
+  border-radius: 50px;
+}
+
+.dept-load-fill.blue {
+  background: var(--blue);
+}
+
+.dept-load-fill.red {
+  background: #ef4444;
+}
+
+.dept-load-fill.indigo {
+  background: #6366f1;
+}
+
+/* Footer */
+.admin-footer {
+  padding: 16px 32px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--white);
+  margin-top: auto;
+}
+
+.admin-footer span,
+.admin-footer .footer-links a {
+  font-size: 11px;
+  color: var(--text-light);
+  text-decoration: none;
+}
+
+.admin-footer .footer-links {
+  display: flex;
+  gap: 14px;
+}
+
+.admin-footer .footer-links a:hover {
+  color: var(--blue);
+}
+
+/* Quick action buttons (inventory header) */
+.pharmacy-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  transition: filter 0.15s, background 0.15s;
+}
+
+.pharmacy-quick-btn:hover {
+  filter: brightness(0.95);
+}
+
+.pharmacy-quick-btn.primary {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.pharmacy-quick-btn.success {
+  background: #16a34a;
+  color: #fff;
 }
