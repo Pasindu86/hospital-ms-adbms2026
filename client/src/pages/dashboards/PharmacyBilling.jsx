@@ -18,7 +18,11 @@ export default function PharmacyBilling() {
   // Billing Form state
   const [billingForm, setBillingForm] = useState({ patientName: '', contactNumber: '' });
   const [billingItems, setBillingItems] = useState([]);
-  const [currentBillItem, setCurrentBillItem] = useState({ drugId: '', quantity: 1 });
+  const [currentBillItem, setCurrentBillItem] = useState({ quantity: 1 });
+  const [drugCodeInput, setDrugCodeInput] = useState('');
+  const [drugNameSearch, setDrugNameSearch] = useState('');
+  const [selectedDrug, setSelectedDrug] = useState(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -65,17 +69,53 @@ export default function PharmacyBilling() {
     setLoading(false);
   };
 
+  // --- Drug Search & Selection Logic ---
+  const filteredDrugs = inventory.filter(d => {
+    if (!drugNameSearch || selectedDrug) return false;
+    const q = drugNameSearch.toLowerCase();
+    return (d.DRUG_NAME || '').toLowerCase().includes(q);
+  });
+
+  const handleAutoFillByCode = () => {
+    if (!drugCodeInput.trim()) return;
+    const found = inventory.find(d => (d.DRUG_CODE || '').toLowerCase() === drugCodeInput.trim().toLowerCase());
+    if (found) {
+      setSelectedDrug(found);
+      setDrugNameSearch(found.DRUG_NAME);
+      setShowSuggestions(false);
+    } else {
+      alert(`No drug found with code "${drugCodeInput}"`);
+    }
+  };
+
+  const handleSelectDrug = (drug) => {
+    setSelectedDrug(drug);
+    setDrugCodeInput(drug.DRUG_CODE || '');
+    setDrugNameSearch(drug.DRUG_NAME);
+    setShowSuggestions(false);
+  };
+
+  const getStockBadge = (quantity) => {
+    if (quantity <= 0) return { label: 'Out of stock', bg: '#fee2e2', color: '#dc2626' };
+    if (quantity <= 20) return { label: 'Low stock', bg: '#fee2e2', color: '#dc2626' };
+    return { label: 'In-stock', bg: '#dcfce7', color: '#16a34a' };
+  };
+
+  const currentSubtotal = selectedDrug ? (Number(currentBillItem.quantity) * Number(selectedDrug.PRICE || 0)) : 0;
+
   const handleAddBillingItem = () => {
-    if (!currentBillItem.drugId || !currentBillItem.quantity) return;
-    const selectedDrug = inventory.find(d => String(d.DRUG_ID) === String(currentBillItem.drugId));
-    if (!selectedDrug) return;
+    if (!selectedDrug || !currentBillItem.quantity) return;
 
     const qty = Number(currentBillItem.quantity);
     if (qty <= 0) return;
+    if (qty > selectedDrug.QUANTITY) {
+      alert(`Insufficient stock! Only ${selectedDrug.QUANTITY} units available for ${selectedDrug.DRUG_NAME}.`);
+      return;
+    }
 
     const drugPrice = selectedDrug.PRICE || 0;
 
-    const existingIndex = billingItems.findIndex(item => String(item.drugId) === String(currentBillItem.drugId));
+    const existingIndex = billingItems.findIndex(item => String(item.drugId) === String(selectedDrug.DRUG_ID));
     if (existingIndex > -1) {
       const updated = [...billingItems];
       updated[existingIndex].quantity += qty;
@@ -93,7 +133,10 @@ export default function PharmacyBilling() {
         }
       ]);
     }
-    setCurrentBillItem({ drugId: '', quantity: 1 });
+    setCurrentBillItem({ quantity: 1 });
+    setSelectedDrug(null);
+    setDrugCodeInput('');
+    setDrugNameSearch('');
   };
 
   const handleRemoveBillingItem = (index) => {
@@ -184,6 +227,9 @@ export default function PharmacyBilling() {
 
       setBillingItems([]);
       setBillingForm({ patientName: '', contactNumber: '' });
+      setSelectedDrug(null);
+      setDrugCodeInput('');
+      setDrugNameSearch('');
       fetchInventory();
     } catch (err) {
       console.error('Error in Billing & Dispensing:', err);
@@ -293,41 +339,169 @@ export default function PharmacyBilling() {
                     </div>
                   </div>
 
-                  <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                    <h4 style={{ margin: '0 0 16px 0', fontSize: '15px', color: '#1e293b', fontWeight: '600' }}>Add Prescribed Drug Row</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px auto', gap: '16px', alignItems: 'end' }}>
-                      <div className="form-field" style={{ marginBottom: 0 }}>
-                        <label style={{ fontWeight: '500', color: '#475569' }}>Select Stock Med</label>
-                        <select
-                          value={currentBillItem.drugId}
-                          onChange={e => setCurrentBillItem({ ...currentBillItem, drugId: e.target.value })}
-                          style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', background: '#fff' }}
+                  <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <h4 style={{ margin: '0 0 16px 0', fontSize: '15px', color: '#1e293b', fontWeight: '700' }}>Add Prescribed Drug Row</h4>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+
+                      {/* Drug Code Input - 120px */}
+                      <div style={{ width: '140px', flexShrink: 0 }}>
+                        <label style={{ fontWeight: '500', color: '#475569', fontSize: '12px', marginBottom: '6px', display: 'block' }}>Drug Code</label>
+                        <div style={{ display: 'flex', gap: '0' }}>
+                          <input
+                            type="text"
+                            placeholder="e.g. DRG001"
+                            value={drugCodeInput}
+                            onChange={e => { setDrugCodeInput(e.target.value); if (selectedDrug) { setSelectedDrug(null); setDrugNameSearch(''); } }}
+                            onKeyDown={e => { if (e.key === 'Enter') handleAutoFillByCode(); }}
+                            style={{ width: '100px', padding: '9px 10px', border: '1px solid #cbd5e1', borderRadius: '6px 0 0 6px', fontSize: '13px', outline: 'none', background: '#fff' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAutoFillByCode}
+                            title="Auto-fill by drug code"
+                            style={{ width: '36px', height: '38px', border: '1px solid #cbd5e1', borderLeft: 'none', borderRadius: '0 6px 6px 0', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', fontSize: '16px', transition: 'background 0.15s' }}
+                            onMouseOver={e => e.currentTarget.style.background = '#fffbeb'}
+                            onMouseOut={e => e.currentTarget.style.background = '#fff'}
+                          >⚡</button>
+                        </div>
+                        {/* Unit Price Badge */}
+                        {selectedDrug && (
+                          <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#475569' }}>
+                            Unit Price: <span style={{ background: '#dcfce7', color: '#16a34a', padding: '2px 8px', borderRadius: '4px', fontWeight: '700', fontSize: '12px' }}>LKR {Number(selectedDrug.PRICE || 0).toFixed(2)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Search Drug Name - Autocomplete */}
+                      <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+                        <label style={{ fontWeight: '500', color: '#475569', fontSize: '12px', marginBottom: '6px', display: 'block' }}>Search Drug Name</label>
+                        <div style={{ position: 'relative' }}>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                          <input
+                            type="text"
+                            placeholder="Search Drug Name"
+                            value={drugNameSearch}
+                            onChange={e => { setDrugNameSearch(e.target.value); setShowSuggestions(true); if (selectedDrug) { setSelectedDrug(null); setDrugCodeInput(''); } }}
+                            onFocus={() => { if (drugNameSearch && !selectedDrug) setShowSuggestions(true); }}
+                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                            style={{ width: '100%', padding: '9px 12px 9px 34px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '13px', outline: 'none', background: '#fff', transition: 'border-color 0.2s, box-shadow 0.2s' }}
+                            onFocusCapture={e => { e.target.style.borderColor = '#3b82f6'; e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.08)'; }}
+                            onBlurCapture={e => { e.target.style.borderColor = '#cbd5e1'; e.target.style.boxShadow = 'none'; }}
+                          />
+                        </div>
+
+                        {/* Autocomplete Suggestions Dropdown */}
+                        {showSuggestions && filteredDrugs.length > 0 && (
+                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', boxShadow: '0 10px 40px rgba(0,0,0,0.12)', zIndex: 50, marginTop: '4px', maxHeight: '220px', overflowY: 'auto' }}>
+                            {filteredDrugs.map(drug => {
+                              const badge = getStockBadge(drug.QUANTITY);
+                              return (
+                                <div
+                                  key={drug.DRUG_ID}
+                                  onClick={() => handleSelectDrug(drug)}
+                                  style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', transition: 'background 0.12s', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                                  onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
+                                  onMouseOut={e => e.currentTarget.style.background = '#fff'}
+                                >
+                                  <div>
+                                    <div style={{ fontWeight: '600', fontSize: '13px', color: '#0f172a', marginBottom: '2px' }}>{drug.DRUG_NAME}</div>
+                                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>Code: {drug.DRUG_CODE || 'N/A'} | Batch: {drug.BATCH_NUMBER || 'N/A'}</div>
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', marginLeft: '12px' }}>
+                                    <span style={{ background: badge.bg, color: badge.color, padding: '3px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' }}>{badge.label}</span>
+                                    <span style={{ fontSize: '10px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{drug.QUANTITY} units</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {showSuggestions && drugNameSearch && !selectedDrug && filteredDrugs.length === 0 && (
+                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', boxShadow: '0 10px 40px rgba(0,0,0,0.12)', zIndex: 50, marginTop: '4px', padding: '16px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+                            No drugs found matching "{drugNameSearch}"
+                          </div>
+                        )}
+
+                        {/* Stock Availability Strip - shown when drug is selected */}
+                        {selectedDrug && (() => {
+                          const badge = getStockBadge(selectedDrug.QUANTITY);
+                          const maxCapacity = selectedDrug.CAPACITY || selectedDrug.QUANTITY || 1;
+                          const stockPct = Math.min(100, Math.round((selectedDrug.QUANTITY / maxCapacity) * 100));
+                          const barColor = selectedDrug.QUANTITY <= 0 ? '#ef4444' : selectedDrug.QUANTITY <= 20 ? '#f59e0b' : '#22c55e';
+                          const requested = Number(currentBillItem.quantity) || 0;
+                          const overLimit = requested > selectedDrug.QUANTITY;
+                          return (
+                            <div style={{ marginTop: '8px', background: '#f8fafc', border: `1px solid ${overLimit ? '#fca5a5' : '#e2e8f0'}`, borderRadius: '8px', padding: '10px 12px', transition: 'border-color 0.2s' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                <span style={{ fontSize: '11px', fontWeight: '600', color: '#475569' }}>Stock Availability</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  {overLimit && (
+                                    <span style={{ fontSize: '10px', color: '#ef4444', fontWeight: '600' }}>⚠ Exceeds stock!</span>
+                                  )}
+                                  <span style={{ background: badge.bg, color: badge.color, padding: '1px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: '700' }}>{badge.label}</span>
+                                  <span style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>{selectedDrug.QUANTITY} <span style={{ fontWeight: '400', color: '#94a3b8' }}>units left</span></span>
+                                </div>
+                              </div>
+                              <div style={{ height: '6px', background: '#e2e8f0', borderRadius: '99px', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${stockPct}%`, background: barColor, borderRadius: '99px', transition: 'width 0.4s ease' }} />
+                              </div>
+                              {selectedDrug.CAPACITY && (
+                                <div style={{ marginTop: '4px', fontSize: '10px', color: '#94a3b8', textAlign: 'right' }}>Capacity: {selectedDrug.CAPACITY} units</div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Qty Spinner - 100px */}
+                      <div style={{ width: '100px', flexShrink: 0 }}>
+                        <label style={{ fontWeight: '500', color: '#475569', fontSize: '12px', marginBottom: '6px', display: 'block' }}>Qty</label>
+                        <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden', background: '#fff', height: '38px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setCurrentBillItem(prev => ({ ...prev, quantity: Math.max(1, Number(prev.quantity) - 1) }))}
+                            style={{ width: '30px', height: '100%', border: 'none', background: '#f8fafc', cursor: 'pointer', fontSize: '16px', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s', padding: 0 }}
+                            onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                            onMouseOut={e => e.currentTarget.style.background = '#f8fafc'}
+                          >−</button>
+                          <input
+                            type="number"
+                            min="1"
+                            value={currentBillItem.quantity}
+                            onChange={e => setCurrentBillItem({ ...currentBillItem, quantity: Math.max(1, Number(e.target.value) || 1) })}
+                            style={{ width: '40px', height: '100%', border: 'none', borderLeft: '1px solid #e2e8f0', borderRight: '1px solid #e2e8f0', textAlign: 'center', fontSize: '14px', fontWeight: '600', outline: 'none', MozAppearance: 'textfield', appearance: 'textfield', padding: 0 }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setCurrentBillItem(prev => ({ ...prev, quantity: Number(prev.quantity) + 1 }))}
+                            style={{ width: '30px', height: '100%', border: 'none', background: '#f8fafc', cursor: 'pointer', fontSize: '16px', color: '#475569', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s', padding: 0 }}
+                            onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                            onMouseOut={e => e.currentTarget.style.background = '#f8fafc'}
+                          >+</button>
+                        </div>
+                      </div>
+
+                      {/* Subtotal Preview */}
+                      <div style={{ width: '140px', flexShrink: 0 }}>
+                        <label style={{ fontWeight: '500', color: '#475569', fontSize: '12px', marginBottom: '6px', display: 'block' }}>Subtotal Preview</label>
+                        <div style={{ height: '38px', display: 'flex', alignItems: 'center', padding: '0 12px', background: selectedDrug ? '#f0fdf4' : '#f1f5f9', border: '1px solid', borderColor: selectedDrug ? '#bbf7d0' : '#e2e8f0', borderRadius: '6px', fontSize: '13px', fontWeight: '700', color: selectedDrug ? '#15803d' : '#94a3b8', transition: 'all 0.2s' }}>
+                          = LKR {currentSubtotal.toFixed(2)}
+                        </div>
+                      </div>
+
+                      {/* Add to Bill Button */}
+                      <div style={{ flexShrink: 0, paddingTop: '20px' }}>
+                        <button
+                          type="button"
+                          onClick={handleAddBillingItem}
+                          disabled={!selectedDrug}
+                          style={{ padding: '0 18px', height: '38px', background: selectedDrug ? '#1e293b' : '#cbd5e1', color: '#fff', border: 'none', borderRadius: '6px', cursor: selectedDrug ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px', transition: 'background 0.2s', whiteSpace: 'nowrap' }}
+                          onMouseOver={e => { if (selectedDrug) e.currentTarget.style.background = '#334155'; }}
+                          onMouseOut={e => { if (selectedDrug) e.currentTarget.style.background = '#1e293b'; }}
                         >
-                          <option value="">-- Choose Item --</option>
-                          {inventory.map(d => (
-                            <option key={d.DRUG_ID} value={d.DRUG_ID}>
-                              {d.DRUG_NAME} [Batch: {d.BATCH_NUMBER || 'N/A'}] (Available: {d.QUANTITY})
-                            </option>
-                          ))}
-                        </select>
+                          + Add to Bill
+                        </button>
                       </div>
-                      <div className="form-field" style={{ marginBottom: 0 }}>
-                        <label style={{ fontWeight: '500', color: '#475569' }}>Qty</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={currentBillItem.quantity}
-                          onChange={e => setCurrentBillItem({ ...currentBillItem, quantity: e.target.value })}
-                          style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px' }}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleAddBillingItem}
-                        style={{ padding: '10px 20px', background: '#334155', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', height: '42px' }}
-                      >
-                        ＋ Add
-                      </button>
                     </div>
                   </div>
 
@@ -375,6 +549,9 @@ export default function PharmacyBilling() {
                         onClick={() => {
                           setBillingItems([]);
                           setBillingForm({ patientName: '', contactNumber: '' });
+                          setSelectedDrug(null);
+                          setDrugCodeInput('');
+                          setDrugNameSearch('');
                         }}
                         style={{ padding: '10px 20px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}
                       >
