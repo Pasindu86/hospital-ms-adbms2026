@@ -349,7 +349,7 @@ export default function PharmacyBilling() {
                         <div style={{ display: 'flex', gap: '0' }}>
                           <input
                             type="text"
-                            placeholder="e.g. DRG001"
+                            placeholder="e.g. D001"
                             value={drugCodeInput}
                             onChange={e => { setDrugCodeInput(e.target.value); if (selectedDrug) { setSelectedDrug(null); setDrugNameSearch(''); } }}
                             onKeyDown={e => { if (e.key === 'Enter') handleAutoFillByCode(); }}
@@ -376,7 +376,7 @@ export default function PharmacyBilling() {
                       <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
                         <label style={{ fontWeight: '500', color: '#475569', fontSize: '12px', marginBottom: '6px', display: 'block' }}>Search Drug Name</label>
                         <div style={{ position: 'relative' }}>
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
                           <input
                             type="text"
                             placeholder="Search Drug Name"

@@ -30,7 +30,8 @@ async function dispense(req, res) {
       return res.status(400).json({ error: `Drug ${drugName || drugId} is out of stock` });
     }
 
-    // Insert the prescription item
+    // Insert the prescription item — TRG_DRUG_STOCK_DECREMENT fires
+    // automatically to decrement DRUG_STOCK.QUANTITY by 1
     await connection.execute(
       `INSERT INTO PRESCRIPTION_ITEM (PRESCRIPTION_ID, DRUG_ID, DOSAGE, DURATION, INSTRUCTIONS)
        VALUES (:prescriptionId, :drugId, :dosage, :duration, :instructions)`,
@@ -43,19 +44,6 @@ async function dispense(req, res) {
       }
     );
 
-    // Update DRUG_STOCK to decrement QUANTITY by 1
-    const updateResult = await connection.execute(
-      `UPDATE DRUG_STOCK
-       SET QUANTITY = QUANTITY - 1
-       WHERE DRUG_ID = :drugId AND QUANTITY > 0`,
-      { drugId: Number(drugId) }
-    );
-
-    if (updateResult.rowsAffected === 0) {
-      throw new Error('Failed to update stock. Drug might have run out of stock during transaction.');
-    }
-
-    // Commit transaction
     await connection.commit();
     res.status(200).json({ message: 'Prescription item dispensed successfully' });
   } catch (error) {
@@ -85,11 +73,11 @@ async function getLowStock(req, res) {
   try {
     connection = await oracledb.getConnection();
     const result = await connection.execute(
-      `SELECT DRUG_ID AS "drugId", 
-              DRUG_CODE AS "drugCode", 
-              DRUG_NAME AS "drugName", 
-              QUANTITY AS "quantity", 
-              MAX_STOCK AS "maxStock"
+      `SELECT DRUG_ID AS "drugId",
+              DRUG_CODE AS "drugCode",
+              DRUG_NAME AS "drugName",
+              QUANTITY AS "quantity",
+              CAPACITY AS "maxStock"
        FROM DRUG_STOCK
        WHERE QUANTITY < 15
        ORDER BY QUANTITY ASC`
@@ -129,7 +117,7 @@ async function getPrescriptions(req, res) {
               ds.QUANTITY AS "drugStockQuantity"
        FROM PRESCRIPTION p
        LEFT JOIN PRESCRIPTION_ITEM pi ON p.PRESCRIPTION_ID = pi.PRESCRIPTION_ID
-       LEFT JOIN PATIENT pat ON p.PATIENT_ID = pat.PATIENT_ID
+       LEFT JOIN PATIENTS pat ON p.PATIENT_ID = pat.PATIENT_ID
        LEFT JOIN DOCTOR doc ON p.DOCTOR_ID = doc.DOCTOR_ID
        LEFT JOIN DRUG_STOCK ds ON pi.DRUG_ID = ds.DRUG_ID
        ORDER BY p.PRESCRIPTION_ID DESC`
@@ -211,12 +199,11 @@ async function addDrug(req, res) {
   try {
     connection = await oracledb.getConnection();
 
-    // Generate finalDrugId manually since we are using the requested INSERT statement
-    const finalDrugId = Math.floor(1000000000 + Math.random() * 9000000000);
-    await connection.execute(
-      `INSERT INTO DRUG_STOCK (DRUG_ID, DRUG_CODE, DRUG_NAME, QUANTITY, PRICE, CAPACITY, MANUFACTURE_DATE, EXPIRE_DATE, BATCH_NUMBER) VALUES (:drugId, :drugCode, :drugName, :quantity, :price, :capacity, TO_DATE(:manufactureDate, 'YYYY-MM-DD'), TO_DATE(:expireDate, 'YYYY-MM-DD'), :batchNumber)`,
+    const result = await connection.execute(
+      `INSERT INTO DRUG_STOCK (DRUG_CODE, DRUG_NAME, QUANTITY, PRICE, CAPACITY, MANUFACTURE_DATE, EXPIRE_DATE, BATCH_NUMBER)
+       VALUES (:drugCode, :drugName, :quantity, :price, :capacity, TO_DATE(:manufactureDate, 'YYYY-MM-DD'), TO_DATE(:expireDate, 'YYYY-MM-DD'), :batchNumber)
+       RETURNING DRUG_ID INTO :drugId`,
       {
-        drugId: finalDrugId,
         drugCode,
         drugName,
         quantity: Number(initialQuantity),
@@ -224,12 +211,14 @@ async function addDrug(req, res) {
         capacity: Number(maxStock),
         manufactureDate,
         expireDate,
-        batchNumber
+        batchNumber,
+        drugId: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
       }
     );
 
     await connection.commit();
-    res.status(201).json({ success: true, message: 'Drug added to inventory successfully' });
+    const newDrugId = result.outBinds.drugId[0];
+    res.status(201).json({ success: true, message: 'Drug added to inventory successfully', drugId: newDrugId });
   } catch (error) {
     console.error('POST /api/pharmacy/add-drug failed:', error); // Log exact SQL issue
     if (connection) {
