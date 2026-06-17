@@ -9,6 +9,7 @@ const adminRoutes = require('./routes/admin')
 const doctorRoutes = require('./routes/doctor')
 const pharmacistRoutes = require('./routes/pharmacist')
 const patientRoutes = require('./routes/patients')
+const receptionRoutes = require('./routes/reception')
 
 dotenv.config({ path: '.env.local' })
 
@@ -49,6 +50,7 @@ app.use('/api/admin', adminRoutes)
 app.use('/api/doctor', doctorRoutes)
 app.use('/api/pharmacist', pharmacistRoutes)
 app.use('/api/patients', patientRoutes)
+app.use('/api/reception', receptionRoutes)
 app.use("/api/pharmacy", require("./routes/pharmacyRoutes"));
 
 app.get('/api/users', async (req, res) => {
