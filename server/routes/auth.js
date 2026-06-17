@@ -19,9 +19,11 @@ router.post('/login', async (req, res) => {
   try {
     connection = await oracledb.getConnection()
     const result = await connection.execute(
-      `SELECT user_id, staff_id, full_name, email, password_hash, role, is_active
-       FROM user_auth
-       WHERE staff_id = :sid OR email = :eid`,
+      `SELECT u.user_id, u.staff_id, u.full_name, u.email, u.password_hash, u.role, u.is_active,
+              p.patient_id
+       FROM user_auth u
+       LEFT JOIN patients p ON p.user_id = u.user_id
+       WHERE u.staff_id = :sid OR u.email = :eid`,
       { sid: staffId, eid: staffId }
     )
 
@@ -40,26 +42,25 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' })
     }
 
-    const token = jwt.sign(
-      {
-        userId: user.USER_ID,
-        staffId: user.STAFF_ID,
-        role: user.ROLE,
-        name: user.FULL_NAME,
-      },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    )
+    const tokenPayload = {
+      userId: user.USER_ID,
+      staffId: user.STAFF_ID,
+      role: user.ROLE,
+      name: user.FULL_NAME,
+    }
+    if (user.PATIENT_ID) tokenPayload.patientId = user.PATIENT_ID
 
-    res.json({
-      token,
-      user: {
-        userId: user.USER_ID,
-        staffId: user.STAFF_ID,
-        name: user.FULL_NAME,
-        role: user.ROLE,
-      },
-    })
+    const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN })
+
+    const userResponse = {
+      userId: user.USER_ID,
+      staffId: user.STAFF_ID,
+      name: user.FULL_NAME,
+      role: user.ROLE,
+    }
+    if (user.PATIENT_ID) userResponse.patientId = user.PATIENT_ID
+
+    res.json({ token, user: userResponse })
   } catch (error) {
     console.error('POST /api/auth/login failed', error)
     res.status(500).json({ error: 'Server error' })

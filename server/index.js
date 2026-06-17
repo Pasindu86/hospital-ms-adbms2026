@@ -9,6 +9,7 @@ const adminRoutes = require('./routes/admin')
 const doctorRoutes = require('./routes/doctor')
 const pharmacistRoutes = require('./routes/pharmacist')
 const patientRoutes = require('./routes/patients')
+const patientPortalRoutes = require('./routes/patient.routes')
 
 dotenv.config({ path: '.env.local' })
 
@@ -47,6 +48,7 @@ app.use('/api/admin', adminRoutes)
 app.use('/api/doctor', doctorRoutes)
 app.use('/api/pharmacist', pharmacistRoutes)
 app.use('/api/patients', patientRoutes)
+app.use('/api/patient', patientPortalRoutes)
 app.use("/api/pharmacy", require("./routes/pharmacyRoutes"));
 
 app.get('/api/users', async (req, res) => {
@@ -106,6 +108,74 @@ app.post('/api/users', async (req, res) => {
   }
 })
 
+async function ensurePatientPortalSchema() {
+  let connection
+  try {
+    connection = await oracledb.getConnection()
+
+    // 1. Check if user_id column exists on patients table
+    const colCheck = await connection.execute(
+      `SELECT column_name FROM user_tab_cols WHERE table_name = 'PATIENTS' AND column_name = 'USER_ID'`
+    )
+    if (colCheck.rows.length === 0) {
+      console.log('Adding user_id column to patients table...')
+      await connection.execute(`
+        BEGIN
+          EXECUTE IMMEDIATE 'ALTER TABLE patients ADD (user_id NUMBER)';
+        EXCEPTION
+          WHEN OTHERS THEN
+            IF SQLCODE != -1430 THEN RAISE; END IF;
+        END;`)
+    }
+
+    // 2. Check if doctor_availability table exists
+    const tableCheck = await connection.execute(
+      `SELECT table_name FROM user_tables WHERE table_name = 'DOCTOR_AVAILABILITY'`
+    )
+    if (tableCheck.rows.length === 0) {
+      console.log('Creating doctor_availability table...')
+      await connection.execute(`
+        BEGIN
+          EXECUTE IMMEDIATE '
+            CREATE TABLE doctor_availability (
+              doctor_id    NUMBER NOT NULL,
+              day_of_week  NUMBER NOT NULL,
+              start_time   VARCHAR2(5) NOT NULL,
+              end_time     VARCHAR2(5) NOT NULL,
+              CONSTRAINT pk_doctor_availability PRIMARY KEY (doctor_id, day_of_week),
+              CONSTRAINT fk_da_doctor FOREIGN KEY (doctor_id) REFERENCES doctor(doctor_id) ON DELETE CASCADE
+            )';
+        EXCEPTION
+          WHEN OTHERS THEN
+            IF SQLCODE != -955 THEN RAISE; END IF;
+        END;`)
+    }
+
+    // Default Mon–Fri 09:00–17:00 for doctors with no schedule yet
+    await connection.execute(`
+      INSERT INTO doctor_availability (doctor_id, day_of_week, start_time, end_time)
+      SELECT d.doctor_id, dw.day_of_week, '09:00', '17:00'
+      FROM doctor d
+      CROSS JOIN (
+        SELECT 1 AS day_of_week FROM dual UNION ALL
+        SELECT 2 FROM dual UNION ALL SELECT 3 FROM dual UNION ALL
+        SELECT 4 FROM dual UNION ALL SELECT 5 FROM dual
+      ) dw
+      WHERE NOT EXISTS (
+        SELECT 1 FROM doctor_availability da WHERE da.doctor_id = d.doctor_id
+      )`)
+
+    await connection.commit()
+    console.log('Patient portal schema ready (patients.user_id, doctor_availability)')
+  } catch (error) {
+    console.warn('Patient portal schema check failed:', error.message)
+  } finally {
+    if (connection) {
+      try { await connection.close() } catch { /* ignore */ }
+    }
+  }
+}
+
 async function start() {
   try {
     const poolConfig = {
@@ -126,8 +196,11 @@ async function start() {
 
     await oracledb.createPool(poolConfig)
 
+    await ensurePatientPortalSchema()
+
     app.listen(Number(PORT), () => {
       console.log(`Server listening on http://localhost:${PORT}`)
+      console.log(`Patient portal: POST http://localhost:${PORT}/api/patient/register`)
     })
   } catch (error) {
     console.error('Failed to start server', error)
