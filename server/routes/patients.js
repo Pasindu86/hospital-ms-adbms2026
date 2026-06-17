@@ -184,6 +184,10 @@ router.post('/appointment', authenticateToken, async (req, res) => {
          v_doctor_name VARCHAR2(100);
          v_payment_id NUMBER;
        BEGIN
+         IF PKG_DOCTOR_AVAILABILITY.FN_IS_WITHIN_AVAILABILITY(:doctorId, :appointmentDate) = 0 THEN
+           RAISE_APPLICATION_ERROR(-20010, 'Doctor is not available at the selected day/time');
+         END IF;
+
          SELECT name INTO v_patient_name FROM patients WHERE patient_id = :patientId;
          SELECT name INTO v_doctor_name FROM doctor WHERE doctor_id = :doctorId;
          
@@ -230,6 +234,9 @@ router.post('/appointment', authenticateToken, async (req, res) => {
     res.status(200).json({ message: 'Appointment booked successfully' })
   } catch (error) {
     console.error('POST /api/patients/appointment failed', error)
+    if (error.message && error.message.includes('ORA-20010')) {
+      return res.status(400).json({ error: 'Doctor is not available at the selected day/time' })
+    }
     res.status(500).json({ error: 'Database error booking appointment: ' + error.message })
   } finally {
     if (connection) {
