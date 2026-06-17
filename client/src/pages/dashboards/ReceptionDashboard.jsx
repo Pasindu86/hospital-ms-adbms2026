@@ -39,6 +39,8 @@ export default function ReceptionDashboard() {
     doctorCharges: '',
     hospitalCharges: ''
   })
+  const [docAvailability, setDocAvailability] = useState([])
+  const [loadingAvail, setLoadingAvail] = useState(false)
 
   // Safe user parsing from localStorage
   let user = { name: 'Staff', role: 'reception' }
@@ -92,6 +94,47 @@ export default function ReceptionDashboard() {
     navigate('/login')
   }
 
+  const fetchDoctorAvailability = async (doctorId) => {
+    if (!doctorId) {
+      setDocAvailability([])
+      return
+    }
+    setLoadingAvail(true)
+    try {
+      const token = localStorage.getItem('token')
+      const res = await axios.get(`${API_URL}/patients/doctors/${doctorId}/availability`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setDocAvailability(res.data.availability || [])
+    } catch (err) {
+      console.error('Failed to fetch doctor availability', err)
+      setDocAvailability([])
+    } finally {
+      setLoadingAvail(false)
+    }
+  }
+
+  // 1 = Monday ... 7 = Sunday (matches DOCTOR_AVAILABILITY.DAY_OF_WEEK)
+  const isoDay = (dateStr) => {
+    if (!dateStr) return null
+    const js = new Date(dateStr).getDay() // 0=Sun..6=Sat
+    return js === 0 ? 7 : js
+  }
+
+  // Validation hint for the currently picked date/time against availability
+  const selectedDayNum = apptData.appointmentDate ? isoDay(apptData.appointmentDate) : null
+  const selectedDayRow = selectedDayNum ? docAvailability.find(d => d.day === selectedDayNum) : null
+  const apptTimeStr = apptData.appointmentDate ? apptData.appointmentDate.slice(11, 16) : ''
+  const hasSchedule = docAvailability.some(d => !d.off)
+  let availabilityWarning = ''
+  if (apptData.doctorId && hasSchedule && apptData.appointmentDate) {
+    if (!selectedDayRow || selectedDayRow.off) {
+      availabilityWarning = 'The doctor is not available on this day.'
+    } else if (apptTimeStr && (apptTimeStr < selectedDayRow.startTime || apptTimeStr > selectedDayRow.endTime)) {
+      availabilityWarning = `Outside working hours (${selectedDayRow.startTime}–${selectedDayRow.endTime}).`
+    }
+  }
+
   const handleRegSubmit = async (e) => {
     e.preventDefault()
     setActionLoading(true)
@@ -140,6 +183,7 @@ export default function ReceptionDashboard() {
       setMessage({ type: 'success', text: `Appointment booked for ${selectedPatient.name}! Total: Rs. ${totalPayment.toFixed(2)}` })
       setSelectedPatient(null)
       setApptData({ doctorId: '', appointmentDate: '', notes: '', doctorCharges: '', hospitalCharges: '' })
+      setDocAvailability([])
       setPatientSearch('')
       fetchPatients()
     } catch (err) {
@@ -319,6 +363,7 @@ export default function ReceptionDashboard() {
                             doctorCharges: doc ? doc.consultationFee : '',
                             hospitalCharges: doc && doc.hospitalCharge ? doc.hospitalCharge : (id ? '500' : '')
                           });
+                          fetchDoctorAvailability(id);
                         }}
                         required>
                         <option value="">-- Choose available doctor --</option>
@@ -326,9 +371,46 @@ export default function ReceptionDashboard() {
                       </select>
                     </div>
 
+                    {apptData.doctorId && (
+                      <div className="availability-card">
+                        <div className="availability-card-head">
+                          <span className="availability-icon">🕒</span>
+                          <span>Doctor's Weekly Availability</span>
+                        </div>
+                        {loadingAvail ? (
+                          <div className="availability-loading">Loading schedule…</div>
+                        ) : !hasSchedule ? (
+                          <div className="availability-note">No fixed schedule set — this doctor can be booked any time.</div>
+                        ) : (
+                          <div className="availability-grid">
+                            {docAvailability.map(d => {
+                              const isPicked = selectedDayNum === d.day
+                              return (
+                                <div
+                                  key={d.day}
+                                  className={`availability-day ${d.off ? 'is-off' : 'is-on'} ${isPicked ? 'is-picked' : ''}`}
+                                >
+                                  <span className="availability-day-name">{d.label.slice(0, 3)}</span>
+                                  <span className="availability-day-time">
+                                    {d.off ? 'Off' : `${d.startTime}–${d.endTime}`}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="form-group">
                       <label>Appointment Date & Time</label>
                       <input type="datetime-local" value={apptData.appointmentDate} onChange={(e) => setApptData({ ...apptData, appointmentDate: e.target.value })} required />
+                      {availabilityWarning && (
+                        <div className="availability-inline warn">⚠ {availabilityWarning}</div>
+                      )}
+                      {!availabilityWarning && apptData.doctorId && hasSchedule && apptData.appointmentDate && selectedDayRow && !selectedDayRow.off && (
+                        <div className="availability-inline ok">✓ Within {selectedDayRow.label} hours ({selectedDayRow.startTime}–{selectedDayRow.endTime}).</div>
+                      )}
                     </div>
 
                     <div className="form-group">
@@ -368,8 +450,8 @@ export default function ReceptionDashboard() {
                       </div>
                     </div>
 
-                    <button type="submit" className="btn-register-submit" disabled={actionLoading}>
-                      {actionLoading ? 'Booking...' : 'Confirm Appointment Slot'}
+                    <button type="submit" className="btn-register-submit" disabled={actionLoading || !!availabilityWarning}>
+                      {actionLoading ? 'Booking...' : availabilityWarning ? 'Doctor Unavailable at This Time' : 'Confirm Appointment Slot'}
                     </button>
                     <button type="button" className="txt-btn" onClick={() => setSelectedPatient(null)}>Pick Different Patient</button>
                   </form>

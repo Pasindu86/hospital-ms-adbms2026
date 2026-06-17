@@ -49,6 +49,48 @@ router.get('/doctors', authenticateToken, async (req, res) => {
   }
 })
 
+// GET a doctor's weekly availability (all 7 days)
+router.get('/doctors/:id/availability', authenticateToken, async (req, res) => {
+  const DAY_LABELS = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  let connection
+  try {
+    connection = await oracledb.getConnection()
+    const result = await connection.execute(
+      `SELECT day_of_week, start_time, end_time
+       FROM doctor_availability
+       WHERE doctor_id = :id
+       ORDER BY day_of_week ASC`,
+      { id: req.params.id }
+    )
+
+    const byDay = {}
+    for (const row of result.rows) {
+      byDay[row.DAY_OF_WEEK] = { startTime: row.START_TIME, endTime: row.END_TIME }
+    }
+
+    const days = []
+    for (let d = 1; d <= 7; d++) {
+      const set = byDay[d]
+      days.push({
+        day: d,
+        label: DAY_LABELS[d],
+        off: !set,
+        startTime: set ? set.startTime : '',
+        endTime: set ? set.endTime : ''
+      })
+    }
+
+    res.json({ availability: days })
+  } catch (error) {
+    console.error('GET /api/patients/doctors/:id/availability failed', error)
+    res.status(500).json({ error: 'Failed to fetch availability' })
+  } finally {
+    if (connection) {
+      try { await connection.close() } catch (e) { /* ignore */ }
+    }
+  }
+})
+
 // GET all patients
 router.get('/', authenticateToken, async (req, res) => {
   let connection
