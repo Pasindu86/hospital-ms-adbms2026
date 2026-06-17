@@ -38,7 +38,30 @@ router.get('/doctors', authenticateToken, async (req, res) => {
        WHERE u.is_active = 1
        ORDER BY d.name ASC`
     )
-    res.json(result.rows)
+
+    // Fetch all doctor availabilities
+    const availResult = await connection.execute(
+      `SELECT doctor_id, day_of_week, start_time, end_time FROM doctor_availability`
+    )
+
+    // Group availability by doctor_id
+    const availMap = {}
+    for (const row of availResult.rows) {
+      const docId = row.DOCTOR_ID
+      if (!availMap[docId]) availMap[docId] = []
+      availMap[docId].push({
+        day: row.DAY_OF_WEEK,
+        startTime: row.START_TIME,
+        endTime: row.END_TIME
+      })
+    }
+
+    const doctorsWithAvail = result.rows.map(d => ({
+      ...d,
+      availability: availMap[d.doctorId] || []
+    }))
+
+    res.json(doctorsWithAvail)
   } catch (error) {
     console.error('GET /api/patients/doctors failed', error)
     res.status(500).json({ error: 'Failed to fetch doctors' })
@@ -283,6 +306,55 @@ router.post('/appointment', authenticateToken, async (req, res) => {
   } finally {
     if (connection) {
       try { await connection.close() } catch (e) { /* ignore */ }
+    }
+  }
+})
+
+// ════════════════════════════════════════════════════════════════════
+// GET patient booking history details (Appointments, Doctors, Payments)
+// ════════════════════════════════════════════════════════════════════
+router.get('/reception/patient/:patientId/history', authenticateToken, async (req, res) => {
+  const patientId = parseInt(req.params.patientId, 10)
+
+  if (isNaN(patientId)) {
+    return res.status(400).json({ error: 'Invalid Patient ID provided.' })
+  }
+
+  let connection
+  try {
+    connection = await oracledb.getConnection()
+
+    // Explicitly fetching previous appointments, respective doctor names, and payment details
+    const result = await connection.execute(
+      `SELECT 
+        a.appointment_date AS "APPOINTMENT_DATE",
+        d.name AS "DOCTOR_NAME",
+        a.doctor_id AS "DOCTOR_ID",
+        a.notes AS "NOTES",
+        a.status AS "STATUS",
+        a.payment_method AS "PAYMENT_METHOD",
+        a.payment_status AS "PAYMENT_STATUS",
+        (SELECT NVL(SUM(p.total_amount), 0) 
+         FROM booking_payment p 
+         WHERE p.patient_id = a.patient_id 
+           AND p.doctor_id = a.doctor_id 
+           AND TRUNC(p.appointment_date) = TRUNC(a.appointment_date)
+        ) AS "TOTAL_AMOUNT"
+       FROM patient_doctor_appointment a
+       JOIN doctor d ON a.doctor_id = d.doctor_id
+       WHERE a.patient_id = :patientId
+       ORDER BY a.appointment_date DESC`,
+      { patientId }
+    )
+
+    // Send the array back to your React client view
+    res.json(result.rows)
+  } catch (error) {
+    console.error(`GET /reception/patient/${patientId}/history failed:`, error)
+    res.status(500).json({ error: 'Database error while retrieving patient logs: ' + error.message })
+  } finally {
+    if (connection) {
+      try { await connection.close() } catch (e) { /* connection close fallback */ }
     }
   }
 })
