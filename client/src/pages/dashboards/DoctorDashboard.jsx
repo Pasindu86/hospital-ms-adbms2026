@@ -255,6 +255,104 @@ export default function DoctorDashboard() {
     navigate('/login')
   }
 
+  // Build a printable patient report (treatment, advice, prescribed drugs) → save as PDF
+  const downloadPatientReport = () => {
+    if (!selectedPatient) return
+
+    const esc = (s) => String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+    const recordsHtml = history.length === 0
+      ? '<p class="empty">No medical records found for this patient.</p>'
+      : history.map(r => {
+          const meds = prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID)
+          const medsHtml = meds.length === 0
+            ? '<p class="none">No medicines prescribed.</p>'
+            : `<table class="meds">
+                 <thead><tr><th>Medicine</th><th>Dosage</th><th>Duration</th><th>Instructions</th></tr></thead>
+                 <tbody>
+                   ${meds.map(m => `<tr>
+                       <td>${esc(m.DRUG_NAME)}</td>
+                       <td>${esc(m.DOSAGE)}</td>
+                       <td>${esc(m.DURATION)}</td>
+                       <td>${esc(m.INSTRUCTIONS) || '—'}</td>
+                     </tr>`).join('')}
+                 </tbody>
+               </table>`
+          return `
+            <div class="record">
+              <div class="record-head">
+                <span class="record-date">${esc(formatDate(r.RECORD_DATE))}</span>
+                <span class="record-doc">Dr. ${esc(r.DOCTOR_NAME)}${r.SPECIALIST_AREA ? ' — ' + esc(r.SPECIALIST_AREA) : ''}</span>
+              </div>
+              <p><strong>Diagnosis:</strong> ${esc(r.DIAGNOSIS) || '—'}</p>
+              ${r.TREATMENT_NOTES ? `<p><strong>Treatment:</strong> ${esc(r.TREATMENT_NOTES)}</p>` : ''}
+              ${r.CLINICAL_ADVICE ? `<p><strong>Clinical Advice:</strong> ${esc(r.CLINICAL_ADVICE)}</p>` : ''}
+              <div class="meds-label">Prescribed Medicines</div>
+              ${medsHtml}
+            </div>`
+        }).join('')
+
+    const html = `
+      <html>
+        <head>
+          <title>Patient Report - ${esc(selectedPatient.name)}</title>
+          <style>
+            * { box-sizing: border-box; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; padding: 32px; }
+            .header { text-align: center; border-bottom: 3px solid #2563eb; padding-bottom: 14px; margin-bottom: 20px; }
+            .header h1 { margin: 0; color: #1d4ed8; font-size: 22px; }
+            .header p { margin: 2px 0 0; color: #64748b; font-size: 13px; }
+            .patient-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; }
+            .patient-box .row { display: flex; justify-content: space-between; font-size: 14px; margin: 3px 0; }
+            .patient-box .label { color: #64748b; }
+            h2.section { font-size: 15px; color: #0f172a; border-left: 4px solid #2563eb; padding-left: 10px; margin: 0 0 14px; }
+            .record { border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; page-break-inside: avoid; }
+            .record-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
+            .record-date { font-weight: 700; color: #1d4ed8; }
+            .record-doc { color: #64748b; font-size: 13px; }
+            .record p { margin: 4px 0; font-size: 13.5px; }
+            .meds-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin: 10px 0 6px; }
+            table.meds { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+            table.meds th, table.meds td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
+            table.meds th { background: #f1f5f9; color: #475569; }
+            .none, .empty { color: #94a3b8; font-style: italic; font-size: 13px; }
+            .footer { margin-top: 28px; border-top: 1px solid #e2e8f0; padding-top: 10px; text-align: center; color: #94a3b8; font-size: 11px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>CarePulse Hospital</h1>
+            <p>Patient Medical Report</p>
+          </div>
+
+          <div class="patient-box">
+            <div class="row"><span class="label">Patient Name</span><strong>${esc(selectedPatient.name)}</strong></div>
+            <div class="row"><span class="label">Patient ID</span><span>#${esc(selectedPatient.id)}</span></div>
+            <div class="row"><span class="label">Gender</span><span>${esc(selectedPatient.gender) || '—'}</span></div>
+            <div class="row"><span class="label">Report Generated</span><span>${new Date().toLocaleString()}</span></div>
+            <div class="row"><span class="label">Attending Doctor</span><span>Dr. ${esc(user.name) || '—'}</span></div>
+          </div>
+
+          <h2 class="section">Treatment History, Advice &amp; Prescriptions</h2>
+          ${recordsHtml}
+
+          <div class="footer">
+            This is a system-generated medical report from CarePulse Hospital Management System.
+          </div>
+          <script>
+            window.onload = function () { window.print(); }
+          </script>
+        </body>
+      </html>`
+
+    const w = window.open('', '_blank')
+    if (w) {
+      w.document.write(html)
+      w.document.close()
+    }
+  }
+
   // Stats
   const totalToday = appointments.length
   const pending = appointments.filter(a => a.STATUS === 'Scheduled').length
@@ -451,6 +549,10 @@ export default function DoctorDashboard() {
                   <h1>Patient: {selectedPatient.name}</h1>
                   <p>Patient ID: #{selectedPatient.id}{selectedAppt ? ` · Appointment: ${formatDate(selectedAppt.APPOINTMENT_DATE)}` : ''}</p>
                 </div>
+                <button className="start-exam-btn primary" onClick={downloadPatientReport} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+                  Download PDF Report
+                </button>
               </div>
 
               {/* Medical History */}
@@ -612,6 +714,12 @@ export default function DoctorDashboard() {
                   <h1>Patient Medical History</h1>
                   <p>Search a patient above to review their previous treatment records, advice and prescribed medicines.</p>
                 </div>
+                {selectedPatient && (
+                  <button className="start-exam-btn primary" onClick={downloadPatientReport} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+                    Download PDF Report
+                  </button>
+                )}
               </div>
 
               {!selectedPatient ? (
