@@ -1,117 +1,135 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import './ReceptionDashboard.css'
 
-const API_URL = 'http://localhost:5000/api'
+const API = 'http://localhost:5000/api'
 
 export default function ReceptionDashboard() {
   const navigate = useNavigate()
+  const [tab, setTab] = useState('overview')
   const [patients, setPatients] = useState([])
   const [doctors, setDoctors] = useState([])
-  const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
-  const [actionLoading, setActionLoading] = useState(false)
-  const [message, setMessage] = useState({ type: '', text: '' })
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState({ type: '', text: '' })
 
-  // Tabs: 'dashboard' (Register), 'appointment', 'patients' (Registry)
-  const [activeTab, setActiveTab] = useState('dashboard')
-  const [showProfileDropdown, setShowProfileDropdown] = useState(false)
+  // Register
+  const [reg, setReg] = useState({ name:'', email:'', address:'', phoneNumber:'', disease:'', dob:'', gender:'Male' })
 
-  // Registration Form State
-  const [regData, setRegData] = useState({
-    name: '',
-    email: '',
-    address: '',
-    phoneNumber: '',
-    disease: '',
-    dob: '',
-    gender: 'Male'
-  })
+  // Book
+  const [pSearch, setPSearch] = useState('')
+  const [pickedPatient, setPickedPatient] = useState(null)
+  const [book, setBook] = useState({ doctorId:'', appointmentDate:'', notes:'', docFee:'', hosFee:'' })
+  const [nextToken, setNextToken] = useState(null)
 
-  // Appointment State
-  const [patientSearch, setPatientSearch] = useState('')
-  const [selectedPatient, setSelectedPatient] = useState(null)
-  const [apptData, setApptData] = useState({
-    doctorId: '',
-    appointmentDate: '',
-    notes: '',
-    doctorCharges: '',
-    hospitalCharges: ''
-  })
+  // Doctor availability state
   const [docAvailability, setDocAvailability] = useState([])
   const [loadingAvail, setLoadingAvail] = useState(false)
   const [bookDate, setBookDate] = useState('')
 
-  // Safe user parsing from localStorage
-  let user = { name: 'Staff', role: 'reception' }
-  try {
-    const userStr = localStorage.getItem('user')
-    if (userStr) {
-      user = JSON.parse(userStr)
-    }
-  } catch (e) {
-    console.error('Failed to parse user from localStorage', e)
-  }
+  // Tokens view
+  const [viewDoc, setViewDoc] = useState(null)
+  const [viewDate, setViewDate] = useState(new Date().toISOString().split('T')[0])
+  const [queue, setQueue] = useState([])
+  const [queueLoading, setQueueLoading] = useState(false)
 
+  // Directory
+  const [filter, setFilter] = useState('')
+
+  // User
+  let user = { name:'Staff', role:'reception' }
+  try {
+    const u = localStorage.getItem('user')
+    if (u) user = JSON.parse(u)
+  } catch (err) {
+    console.warn('Failed to parse user from localStorage', err)
+  }
   const userName = user.name || 'Staff'
 
-  // Load patients and doctors
-  useEffect(() => {
-    fetchPatients()
-    fetchDoctors()
-  }, [])
+  const authHeader = useCallback(() => ({
+    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+  }), [])
 
-  const fetchPatients = async () => {
+  const loadPatients = useCallback(async () => {
     setLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      const res = await axios.get(`${API_URL}/patients`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setPatients(res.data || [])
-    } catch (err) {
-      console.error('Failed to fetch patients', err)
+      const r = await axios.get(`${API}/patients`, authHeader())
+      setPatients(r.data || [])
+    } catch (e) {
+      console.error(e)
     } finally {
       setLoading(false)
     }
-  }
+  }, [authHeader])
 
-  const fetchDoctors = async () => {
+  const loadDoctors = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token')
-      const res = await axios.get(`${API_URL}/patients/doctors`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setDoctors(res.data || [])
-    } catch (err) {
-      console.error('Failed to fetch doctors', err)
+      const r = await axios.get(`${API}/patients/doctors`, authHeader())
+      setDoctors(r.data || [])
+    } catch (e) {
+      console.error(e)
     }
-  }
+  }, [authHeader])
 
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    navigate('/login')
-  }
+  useEffect(() => {
+    Promise.resolve().then(() => {
+      loadPatients()
+      loadDoctors()
+    })
+  }, [loadPatients, loadDoctors])
 
-  const fetchDoctorAvailability = async (doctorId) => {
+  const fetchDoctorAvailability = useCallback(async (doctorId) => {
     if (!doctorId) {
       setDocAvailability([])
       return
     }
     setLoadingAvail(true)
     try {
-      const token = localStorage.getItem('token')
-      const res = await axios.get(`${API_URL}/patients/doctors/${doctorId}/availability`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const res = await axios.get(`${API}/patients/doctors/${doctorId}/availability`, authHeader())
       setDocAvailability(res.data.availability || [])
     } catch (err) {
       console.error('Failed to fetch doctor availability', err)
       setDocAvailability([])
     } finally {
       setLoadingAvail(false)
+    }
+  }, [authHeader])
+
+  // Token fetch
+  useEffect(() => {
+    if (!book.doctorId || !book.appointmentDate) return
+    let active = true
+    axios.get(`${API}/reception/doctor/${book.doctorId}/token?date=${book.appointmentDate}`)
+      .then(r => { if (active) setNextToken(r.data.nextToken) })
+      .catch(() => { if (active) setNextToken(null) })
+    return () => { active = false }
+  }, [book.doctorId, book.appointmentDate])
+
+  // Queue fetch
+  useEffect(() => {
+    if (!viewDoc) return
+    let active = true
+    axios.get(`${API}/reception/doctor/${viewDoc.doctorId}/bookings?date=${viewDate}`)
+      .then(r => { if (active) setQueue(r.data.bookings || []) })
+      .catch(() => { if (active) setQueue([]) })
+      .finally(() => { if (active) setQueueLoading(false) })
+    return () => { active = false }
+  }, [viewDoc, viewDate])
+
+  const handleRegister = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setMsg({type:'',text:''})
+    try {
+      await axios.post(`${API}/patients`, reg, authHeader())
+      setMsg({type:'success', text:'Patient registered successfully!'})
+      setReg({ name:'', email:'', address:'', phoneNumber:'', disease:'', dob:'', gender:'Male' })
+      loadPatients()
+    } catch (err) {
+      setMsg({type:'error', text: err.response?.data?.error || 'Registration failed.'})
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -123,12 +141,12 @@ export default function ReceptionDashboard() {
   }
 
   // Validation hint for the currently picked date/time against availability
-  const selectedDayNum = apptData.appointmentDate ? isoDay(apptData.appointmentDate) : null
+  const selectedDayNum = book.appointmentDate ? isoDay(book.appointmentDate) : null
   const selectedDayRow = selectedDayNum ? docAvailability.find(d => d.day === selectedDayNum) : null
-  const apptTimeStr = apptData.appointmentDate ? apptData.appointmentDate.slice(11, 16) : ''
+  const apptTimeStr = book.appointmentDate ? book.appointmentDate.slice(11, 16) : ''
   const hasSchedule = docAvailability.some(d => !d.off)
   let availabilityWarning = ''
-  if (apptData.doctorId && hasSchedule && apptData.appointmentDate) {
+  if (book.doctorId && hasSchedule && book.appointmentDate) {
     if (!selectedDayRow || selectedDayRow.off) {
       availabilityWarning = 'The doctor is not available on this day.'
     } else if (apptTimeStr && (apptTimeStr < selectedDayRow.startTime || apptTimeStr > selectedDayRow.endTime)) {
@@ -158,94 +176,71 @@ export default function ReceptionDashboard() {
     : []
 
   // When a doctor has no fixed schedule, fall back to a generic working-hours list
-  const fallbackSlots = (!hasSchedule && apptData.doctorId) ? buildSlots('08:00', '20:00') : []
+  const fallbackSlots = (!hasSchedule && book.doctorId) ? buildSlots('08:00', '20:00') : []
   const slotsToShow = hasSchedule ? timeSlots : fallbackSlots
 
-  const pickedTime = apptData.appointmentDate ? apptData.appointmentDate.slice(11, 16) : ''
+  const pickedTime = book.appointmentDate ? book.appointmentDate.slice(11, 16) : ''
 
   const selectDate = (dateStr) => {
     setBookDate(dateStr)
     // Reset any previously picked time when the date changes
-    setApptData(prev => ({ ...prev, appointmentDate: '' }))
+    setBook(prev => ({ ...prev, appointmentDate: '' }))
+    setNextToken(null)
   }
 
   const selectSlot = (time) => {
     if (!bookDate) return
-    setApptData(prev => ({ ...prev, appointmentDate: `${bookDate}T${time}` }))
+    setBook(prev => ({ ...prev, appointmentDate: `${bookDate}T${time}` }))
   }
 
-  const handleRegSubmit = async (e) => {
+  const handleBook = async (e) => {
     e.preventDefault()
-    setActionLoading(true)
-    setMessage({ type: '', text: '' })
-    try {
-      const token = localStorage.getItem('token')
-      await axios.post(`${API_URL}/patients`, regData, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setMessage({ type: 'success', text: 'Patient registered successfully!' })
-      setRegData({ name: '', email: '', address: '', phoneNumber: '', disease: '', dob: '', gender: 'Male' })
-      fetchPatients()
-    } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to register patient.' })
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handleApptSubmit = async (e) => {
-    e.preventDefault()
-    if (!selectedPatient || !apptData.doctorId || !apptData.appointmentDate) {
-      setMessage({ type: 'error', text: 'Please fill in all required fields.' })
+    if (!pickedPatient || !book.doctorId || !book.appointmentDate) {
+      setMsg({type:'error', text:'Complete all required fields.'})
       return
     }
-    setActionLoading(true)
-    setMessage({ type: '', text: '' })
+    setBusy(true)
+    setMsg({type:'',text:''})
     try {
-      const token = localStorage.getItem('token')
-      const doctorChargesNum = parseFloat(apptData.doctorCharges) || 0
-      const hospitalChargesNum = parseFloat(apptData.hospitalCharges) || 0
-      const totalPayment = doctorChargesNum + hospitalChargesNum
-      await axios.post(`${API_URL}/patients/appointment`, {
-        patientId: selectedPatient.patientId,
-        doctorId: apptData.doctorId,
-        appointmentDate: apptData.appointmentDate,
-        notes: apptData.notes,
-        paymentMethod: 'Cash',
-        paymentStatus: 'Pending',
-        doctorCharges: doctorChargesNum,
-        hospitalCharges: hospitalChargesNum,
-        totalPayment
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      setMessage({ type: 'success', text: `Appointment booked for ${selectedPatient.name}! Total: Rs. ${totalPayment.toFixed(2)}` })
-      setSelectedPatient(null)
-      setApptData({ doctorId: '', appointmentDate: '', notes: '', doctorCharges: '', hospitalCharges: '' })
+      const df = parseFloat(book.docFee)||0, hf = parseFloat(book.hosFee)||0
+      await axios.post(`${API}/patients/appointment`, {
+        patientId: pickedPatient.patientId, doctorId: book.doctorId,
+        appointmentDate: book.appointmentDate, notes: book.notes,
+        paymentMethod:'Cash', paymentStatus:'Pending',
+        doctorCharges: df, hospitalCharges: hf, totalPayment: df+hf
+      }, authHeader())
+      setMsg({type:'success', text:`Booked! Token #${nextToken||'—'} for ${pickedPatient.name}. Total: Rs. ${(df+hf).toFixed(2)}`})
+      setPickedPatient(null)
+      setBook({doctorId:'',appointmentDate:'',notes:'',docFee:'',hosFee:''})
+      setPSearch('')
+      setNextToken(null)
+      loadPatients()
       setDocAvailability([])
       setBookDate('')
-      setPatientSearch('')
-      fetchPatients()
     } catch (err) {
-      setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to book appointment.' })
+      setMsg({type:'error', text: err.response?.data?.error || 'Booking failed.'})
     } finally {
-      setActionLoading(false)
+      setBusy(false)
     }
   }
 
-  // Deduplicate patients by patientId
-  const uniquePatients = Array.from(new Map(patients.map(p => [p.patientId, p])).values())
+  const logout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    navigate('/login')
+  }
 
-  const allocationSearchResults = patientSearch.trim() ? uniquePatients.filter(p =>
-    (p.name || '').toLowerCase().includes(patientSearch.toLowerCase()) ||
-    (p.patientId || '').toString().includes(patientSearch) ||
-    (p.email || '').toLowerCase().includes(patientSearch.toLowerCase()) ||
-    (p.phoneNumber || '').includes(patientSearch)
-  ).slice(0, 10) : []
-
-  const directoryResults = uniquePatients.filter(p => {
-    const term = searchTerm.toLowerCase()
-    return (p.name || '').toLowerCase().includes(term) || (p.patientId || '').toString().includes(term)
+  // Helpers
+  const uniq = Array.from(new Map(patients.map(p => [p.patientId, p])).values())
+  const searchHits = pSearch.trim() ? uniq.filter(p =>
+    (p.name||'').toLowerCase().includes(pSearch.toLowerCase()) ||
+    String(p.patientId).includes(pSearch) ||
+    (p.email||'').toLowerCase().includes(pSearch.toLowerCase()) ||
+    (p.phoneNumber||'').includes(pSearch)
+  ).slice(0, 8) : []
+  const dirResults = uniq.filter(p => {
+    const t = filter.toLowerCase()
+    return (p.name||'').toLowerCase().includes(t) || String(p.patientId).includes(t)
   })
 
   return (
@@ -253,26 +248,32 @@ export default function ReceptionDashboard() {
       {/* Sidebar - Consistent with Admin/Nurse */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">✚</div>
+          <div className="sidebar-brand-icon">✓</div>
           <div className="sidebar-brand-text">
             <h2>CarePulse</h2>
             <span>Hospital MS</span>
           </div>
         </div>
         <nav className="sidebar-nav">
-          <button className={`sidebar-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-            <span className="nav-icon">👤</span> <span className="nav-label">Registration</span>
+          <button className={`sidebar-nav-item ${tab === 'overview' ? 'active' : ''}`} onClick={() => setTab('overview')}>
+            <span className="nav-label">Overview</span>
           </button>
-          <button className={`sidebar-nav-item ${activeTab === 'appointment' ? 'active' : ''}`} onClick={() => setActiveTab('appointment')}>
-            <span className="nav-icon">📅</span> <span className="nav-label">Book Appointment</span>
+          <button className={`sidebar-nav-item ${tab === 'register' ? 'active' : ''}`} onClick={() => setTab('register')}>
+            <span className="nav-label">Registration</span>
           </button>
-          <button className={`sidebar-nav-item ${activeTab === 'patients' ? 'active' : ''}`} onClick={() => setActiveTab('patients')}>
-            <span className="nav-icon">📋</span> <span className="nav-label">Patient Directory</span>
+          <button className={`sidebar-nav-item ${tab === 'book' ? 'active' : ''}`} onClick={() => setTab('book')}>
+            <span className="nav-label">Book Appointment</span>
+          </button>
+          <button className={`sidebar-nav-item ${tab === 'tokens' ? 'active' : ''}`} onClick={() => setTab('tokens')}>
+            <span className="nav-label">Token Queue</span>
+          </button>
+          <button className={`sidebar-nav-item ${tab === 'directory' ? 'active' : ''}`} onClick={() => setTab('directory')}>
+            <span className="nav-label">Patient Directory</span>
           </button>
         </nav>
         <div className="sidebar-bottom">
-          <button className="sidebar-bottom-item logout" onClick={handleLogout}>
-            <span className="nav-icon">↪</span> <span className="nav-label">Logout</span>
+          <button className="sidebar-bottom-item logout" onClick={logout}>
+            <span className="nav-label">Logout</span>
           </button>
         </div>
       </aside>
@@ -280,10 +281,16 @@ export default function ReceptionDashboard() {
       <div className="main-area">
         <header className="topbar">
           <div className="page-title">
-            <h1>{activeTab === 'dashboard' ? 'New Patient Registration' : activeTab === 'appointment' ? 'Appointment Booking' : 'Medical Registry'}</h1>
+            <h1>
+              {tab === 'overview' && 'Dashboard Overview'}
+              {tab === 'register' && 'New Patient Registration'}
+              {tab === 'book' && 'Appointment Booking'}
+              {tab === 'tokens' && 'Doctor Token Queues'}
+              {tab === 'directory' && 'Patient Medical Directory'}
+            </h1>
           </div>
           <div className="topbar-right">
-            <div className="topbar-profile" onClick={() => setShowProfileDropdown(!showProfileDropdown)}>
+            <div className="topbar-profile">
               <div className="topbar-profile-info">
                 <span className="topbar-profile-name">{userName}</span>
                 <span className="topbar-profile-role">Receptionist</span>
@@ -294,164 +301,211 @@ export default function ReceptionDashboard() {
         </header>
 
         <main className="page-content">
-          {message.text && (
-            <div className={`alert alert-${message.type}`}>
-              {message.text}
-            </div>
-          )}
+          {msg.text && <div className={`rx-alert ${msg.type}`}>{msg.type === 'success' ? '✓' : '✕'} {msg.text}</div>}
 
-          {/* ADMISSION TAB */}
-          {activeTab === 'dashboard' && (
-            <div className="table-card full-width-card">
-              <div className="table-card-header">
-                <h2>Registration Form</h2>
-              </div>
-              <form onSubmit={handleRegSubmit} className="registration-form">
-                <div className="form-group-row">
-                  <div className="form-group">
-                    <label>Full Patient Name</label>
-                    <input type="text" value={regData.name} onChange={(e) => setRegData({ ...regData, name: e.target.value })} required placeholder="e.g. John Doe" />
-                  </div>
-                  <div className="form-group">
-                    <label>Email Address</label>
-                    <input type="email" value={regData.email} onChange={(e) => setRegData({ ...regData, email: e.target.value })} placeholder="patient@example.com" />
+          {/* ════════ OVERVIEW ════════ */}
+          {tab === 'overview' && (
+            <>
+              <div className="rx-stats-strip">
+                <div className="rx-stat">
+                  <div>
+                    <div className="rx-stat-label">Total Patients</div>
+                    <div className="rx-stat-value">{uniq.length}</div>
                   </div>
                 </div>
-                <div className="form-group-row">
-                  <div className="form-group">
-                    <label>Contact Number</label>
-                    <input type="text" value={regData.phoneNumber} onChange={(e) => setRegData({ ...regData, phoneNumber: e.target.value })} placeholder="+94 7X XXX XXXX" />
-                  </div>
-                  <div className="form-group">
-                    <label>Date of Birth</label>
-                    <input type="date" value={regData.dob} onChange={(e) => setRegData({ ...regData, dob: e.target.value })} required />
+                <div className="rx-stat">
+                  <div>
+                    <div className="rx-stat-label">Doctors</div>
+                    <div className="rx-stat-value">{doctors.length}</div>
                   </div>
                 </div>
-                <div className="form-group-row">
-                  <div className="form-group">
-                    <label>Gender</label>
-                    <select value={regData.gender} onChange={(e) => setRegData({ ...regData, gender: e.target.value })}>
-                      <option>Male</option><option>Female</option><option>Other</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Residential Address</label>
-                    <input type="text" value={regData.address} onChange={(e) => setRegData({ ...regData, address: e.target.value })} placeholder="City, Street" />
+                <div className="rx-stat">
+                  <div>
+                    <div className="rx-stat-label">Today</div>
+                    <div className="rx-stat-value">{new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'short'})}</div>
                   </div>
                 </div>
-                <div className="form-group">
-                  <label>Initial Symptoms / Complaint</label>
-                  <textarea rows="3" value={regData.disease} onChange={(e) => setRegData({ ...regData, disease: e.target.value })} placeholder="Brief description..."></textarea>
-                </div>
-                <button type="submit" className="btn-register-submit" disabled={actionLoading}>
-                  {actionLoading ? 'Saving...' : 'Confirm Registration'}
-                </button>
-              </form>
-            </div>
-          )}
-
-          {/* APPOINTMENT TAB (Enhanced Search + Details) */}
-          {activeTab === 'appointment' && (
-            <div className="allocation-workflow">
-              <div className="search-section">
-                <div className="table-card-header"><h2>1. Find Patient Profile</h2></div>
-                <div className="search-box-wrap">
-                  <input
-                    type="text"
-                    placeholder="Search by ID, Name, Email or Phone..."
-                    className="search-input-fancy"
-                    value={patientSearch}
-                    onChange={(e) => { setPatientSearch(e.target.value); setSelectedPatient(null); }}
-                  />
-                </div>
-                <div className="results-list">
-                  {allocationSearchResults.map(p => (
-                    <div key={p.patientId} className={`result-item ${selectedPatient?.patientId === p.patientId ? 'is-selected' : ''}`} onClick={() => setSelectedPatient(p)}>
-                      <div className="r-info">
-                        <strong>{p.name}</strong>
-                        <span>{p.phoneNumber || p.email || 'No contact info'}</span>
-                        <small>PT-{p.patientId} • {p.gender}</small>
-                      </div>
-                      {selectedPatient?.patientId === p.patientId && <div className="r-check">✓</div>}
+                <div className="rx-stat">
+                  <div>
+                    <div className="rx-stat-label">Quick Actions</div>
+                    <div style={{marginTop:4}}>
+                      <button className="rx-btn rx-btn-teal" style={{padding:'6px 14px', fontSize:12}} onClick={() => setTab('book')}>
+                        + New Booking
+                      </button>
                     </div>
-                  ))}
-                  {patientSearch && allocationSearchResults.length === 0 && <div className="no-res">No records found for that search.</div>}
-                  {!patientSearch && <div className="no-res" style={{ paddingTop: '40px' }}>Start typing (Name/ID/Email/Phone)...</div>}
+                  </div>
                 </div>
               </div>
 
-              <div className={`action-section ${!selectedPatient ? 'is-locked' : ''}`}>
-                <div className="table-card-header"><h2>2. Booking Details</h2></div>
-                {selectedPatient ? (
-                  <form onSubmit={handleApptSubmit} className="registration-form">
-                    <div className="selected-preview">
-                      <div className="pt-tag">Booking for: <strong>{selectedPatient.name}</strong></div>
-                      <p>PT-{selectedPatient.patientId} • {selectedPatient.email || selectedPatient.phoneNumber || 'N/A'}</p>
-                      <p style={{ fontSize: '11px', color: 'var(--text-light)' }}>Gender: {selectedPatient.gender} | DOB: {new Date(selectedPatient.dateOfBirth || selectedPatient.dob).toLocaleDateString()}</p>
+              <div className="rx-section-title">Available Doctors</div>
+              <div className="rx-doctor-grid">
+                {doctors.map(d => (
+                  <div key={d.doctorId} className="rx-doctor-card" onClick={() => { setViewDoc(d); setTab('tokens'); setQueueLoading(true); }}>
+                    <div className="rx-doc-avatar">Dr</div>
+                    <div className="rx-doc-info">
+                      <div className="rx-doc-name">Dr. {d.fullName}</div>
+                      <div className="rx-doc-spec">{d.specialistArea || 'General Practice'}</div>
+                      <div className="rx-doc-fee">Rs. {d.consultationFee || 0}</div>
                     </div>
+                  </div>
+                ))}
+                {doctors.length === 0 && <div className="rx-empty-state">No doctors registered.</div>}
+              </div>
+            </>
+          )}
 
-                    <div className="form-group">
-                      <label>Select Physician</label>
-                      <select
-                        value={apptData.doctorId}
-                        onChange={(e) => {
-                          const id = e.target.value;
-                          const doc = doctors.find(d => String(d.doctorId) === String(id));
-                          setApptData({
-                            ...apptData,
-                            doctorId: id,
-                            doctorCharges: doc ? doc.consultationFee : '',
-                            hospitalCharges: doc && doc.hospitalCharge ? doc.hospitalCharge : (id ? '500' : '')
-                          });
-                          setBookDate('');
-                          fetchDoctorAvailability(id);
-                        }}
-                        required>
-                        <option value="">-- Choose available doctor --</option>
-                        {doctors.map(d => <option key={d.doctorId} value={d.doctorId}>Dr. {d.fullName} (Fee: Rs {d.consultationFee || 0})</option>)}
+          {/* ════════ REGISTER ════════ */}
+          {tab === 'register' && (
+            <div className="rx-panel" style={{maxWidth: 700}}>
+              <div className="rx-panel-head"><h3>New Patient Registration</h3></div>
+              <div className="rx-panel-body">
+                <form onSubmit={handleRegister} className="rx-form">
+                  <div className="rx-form-row">
+                    <div className="rx-field">
+                      <label>Full Name *</label>
+                      <input value={reg.name} onChange={e => setReg({...reg, name:e.target.value})} required placeholder="Patient name" />
+                    </div>
+                    <div className="rx-field">
+                      <label>Email</label>
+                      <input type="email" value={reg.email} onChange={e => setReg({...reg, email:e.target.value})} placeholder="email@example.com" />
+                    </div>
+                  </div>
+                  <div className="rx-form-row">
+                    <div className="rx-field">
+                      <label>Phone</label>
+                      <input value={reg.phoneNumber} onChange={e => setReg({...reg, phoneNumber:e.target.value})} placeholder="+94 7X XXX XXXX" />
+                    </div>
+                    <div className="rx-field">
+                      <label>Date of Birth *</label>
+                      <input type="date" value={reg.dob} onChange={e => setReg({...reg, dob:e.target.value})} required />
+                    </div>
+                  </div>
+                  <div className="rx-form-row">
+                    <div className="rx-field">
+                      <label>Gender</label>
+                      <select value={reg.gender} onChange={e => setReg({...reg, gender:e.target.value})}>
+                        <option>Male</option><option>Female</option><option>Other</option>
                       </select>
                     </div>
+                    <div className="rx-field">
+                      <label>Address</label>
+                      <input value={reg.address} onChange={e => setReg({...reg, address:e.target.value})} placeholder="City, Street" />
+                    </div>
+                  </div>
+                  <div className="rx-field">
+                    <label>Symptoms / Complaint</label>
+                    <textarea value={reg.disease} onChange={e => setReg({...reg, disease:e.target.value})} placeholder="Brief description..." />
+                  </div>
+                  <button type="submit" className="rx-btn rx-btn-teal" disabled={busy}>
+                    {busy ? 'Saving...' : 'Confirm Registration'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
 
-                    {apptData.doctorId && (
-                      <div className="availability-card">
-                        <div className="availability-card-head">
-                          <span className="availability-icon">🕒</span>
-                          <span>Doctor's Weekly Availability</span>
-                        </div>
-                        {loadingAvail ? (
-                          <div className="availability-loading">Loading schedule…</div>
-                        ) : !hasSchedule ? (
-                          <div className="availability-note">No fixed schedule set — this doctor can be booked any time.</div>
-                        ) : (
-                          <div className="availability-grid">
-                            {docAvailability.map(d => {
-                              const isPicked = selectedDayNum === d.day
-                              return (
-                                <div
-                                  key={d.day}
-                                  className={`availability-day ${d.off ? 'is-off' : 'is-on'} ${isPicked ? 'is-picked' : ''}`}
-                                >
-                                  <span className="availability-day-name">{d.label.slice(0, 3)}</span>
-                                  <span className="availability-day-time">
-                                    {d.off ? 'Off' : `${d.startTime}–${d.endTime}`}
-                                  </span>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        )}
+          {/* ════════ BOOK APPOINTMENT ════════ */}
+          {tab === 'book' && (
+            <div className="rx-book-layout">
+              {/* Left — Patient Search */}
+              <div className="rx-panel">
+                <div className="rx-panel-head"><h3>Select Patient</h3></div>
+                <div className="rx-panel-body" style={{paddingBottom: 4}}>
+                  <div className="rx-search-box">
+                    <input
+                      placeholder="Search name, ID, email, phone..."
+                      value={pSearch}
+                      onChange={e => { setPSearch(e.target.value); setPickedPatient(null); setNextToken(null) }}
+                    />
+                  </div>
+                </div>
+                <div className="rx-patient-list">
+                  {searchHits.map(p => (
+                    <div key={p.patientId} className={`rx-p-item ${pickedPatient?.patientId === p.patientId ? 'picked' : ''}`} onClick={() => setPickedPatient(p)}>
+                      <div>
+                        <div className="rx-p-name">{p.name}</div>
+                        <div className="rx-p-sub">PT-{p.patientId} · {p.phoneNumber || p.email || '—'} · {p.gender}</div>
                       </div>
-                    )}
+                      {pickedPatient?.patientId === p.patientId && <div className="rx-p-check">✓</div>}
+                    </div>
+                  ))}
+                  {pSearch && searchHits.length === 0 && <div className="rx-empty-state">No patients found.</div>}
+                  {!pSearch && <div className="rx-empty-state">Type to search patients...</div>}
+                </div>
+              </div>
 
-                    <div className="form-group">
-                      <label>Appointment Date & Time</label>
-                      <input
-                        type="date"
-                        min={todayStr}
-                        value={bookDate}
-                        onChange={(e) => selectDate(e.target.value)}
-                        required
-                      />
+              {/* Right — Booking Form */}
+              <div className={`rx-panel ${!pickedPatient ? 'rx-locked-panel' : ''}`}>
+                <div className="rx-panel-head"><h3>Booking Details</h3></div>
+                <div className="rx-panel-body">
+                  {pickedPatient ? (
+                    <form onSubmit={handleBook} className="rx-form">
+                      <div className="rx-selected-patient">
+                        <div>
+                          <strong>{pickedPatient.name}</strong>
+                          <span style={{display:'block'}}>PT-{pickedPatient.patientId} · {pickedPatient.email || pickedPatient.phoneNumber || '—'}</span>
+                        </div>
+                      </div>
+
+                      <div className="rx-field">
+                        <label>Doctor *</label>
+                        <select value={book.doctorId} onChange={e => {
+                          const id = e.target.value
+                          const d = doctors.find(x => String(x.doctorId) === String(id))
+                          setBook({...book, doctorId: id,
+                            docFee: d ? d.consultationFee : '',
+                            hosFee: d && d.hospitalCharge ? d.hospitalCharge : (id ? '500' : '')
+                          })
+                          setBookDate('')
+                          setNextToken(null)
+                          fetchDoctorAvailability(id)
+                        }} required>
+                          <option value="">Choose doctor</option>
+                          {doctors.map(d => <option key={d.doctorId} value={d.doctorId}>Dr. {d.fullName} — Rs. {d.consultationFee||0}</option>)}
+                        </select>
+                      </div>
+
+                      {book.doctorId && (
+                        <div className="availability-card">
+                          <div className="availability-card-head">
+                            <span className="availability-icon">🕒</span>
+                            <span>Doctor's Weekly Availability</span>
+                          </div>
+                          {loadingAvail ? (
+                            <div className="availability-loading">Loading schedule…</div>
+                          ) : !hasSchedule ? (
+                            <div className="availability-note">No fixed schedule set — this doctor can be booked any time.</div>
+                          ) : (
+                            <div className="availability-grid">
+                              {docAvailability.map(d => {
+                                const isPicked = selectedDayNum === d.day
+                                return (
+                                  <div
+                                    key={d.day}
+                                    className={`availability-day ${d.off ? 'is-off' : 'is-on'} ${isPicked ? 'is-picked' : ''}`}
+                                  >
+                                    <span className="availability-day-name">{d.label.slice(0, 3)}</span>
+                                    <span className="availability-day-time">
+                                      {d.off ? 'Off' : `${d.startTime}–${d.endTime}`}
+                                    </span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="rx-field">
+                        <label>Date *</label>
+                        <input
+                          type="date"
+                          min={todayStr}
+                          value={bookDate}
+                          onChange={(e) => selectDate(e.target.value)}
+                          required
+                        />
+                      </div>
 
                       {bookDate && (
                         <>
@@ -482,96 +536,133 @@ export default function ReceptionDashboard() {
                       {availabilityWarning && (
                         <div className="availability-inline warn">⚠ {availabilityWarning}</div>
                       )}
-                      {!availabilityWarning && apptData.appointmentDate && (
-                        <div className="availability-inline ok">✓ Booking {new Date(apptData.appointmentDate).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })} at {pickedTime}.</div>
+                      {!availabilityWarning && book.appointmentDate && (
+                        <div className="availability-inline ok">✓ Booking {new Date(book.appointmentDate).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })} at {pickedTime}.</div>
+                      )}
+
+                      {nextToken !== null && (
+                        <div className="rx-token-highlight">
+                          <div className="rx-token-label">Your Token Number</div>
+                          <div className="rx-token-big">{nextToken}</div>
+                        </div>
+                      )}
+
+                      <div className="rx-field">
+                        <label>Notes</label>
+                        <input value={book.notes} onChange={e => setBook({...book, notes:e.target.value})} placeholder="Optional notes..." />
+                      </div>
+
+                      <div className="rx-pay-box">
+                        <div className="rx-pay-title">Payment Summary</div>
+                        <div className="rx-pay-row"><span>Doctor Fee</span><span>Rs. {parseFloat(book.docFee)||0}</span></div>
+                        <div className="rx-pay-row"><span>Hospital Fee</span><span>Rs. {parseFloat(book.hosFee)||0}</span></div>
+                        <div className="rx-pay-total">
+                          <span>Total</span>
+                          <span>Rs. {((parseFloat(book.docFee)||0)+(parseFloat(book.hosFee)||0)).toFixed(2)}</span>
+                        </div>
+                      </div>
+
+                      <button type="submit" className="rx-btn rx-btn-teal" disabled={busy || !!availabilityWarning} style={{width:'100%'}}>
+                        {busy ? 'Booking...' : availabilityWarning ? 'Doctor Unavailable at This Time' : 'Confirm Booking'}
+                      </button>
+                      <button type="button" className="rx-btn rx-btn-ghost" onClick={() => { setPickedPatient(null); setNextToken(null) }} style={{width:'100%'}}>
+                        Cancel
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="rx-empty-state">Select a patient from the left panel first.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ════════ TOKEN QUEUE ════════ */}
+          {tab === 'tokens' && (
+            <div className="rx-tokens-layout">
+              <div className="rx-panel">
+                <div className="rx-panel-head"><h3>Doctors</h3></div>
+                <div className="rx-doc-list-scroll">
+                  {doctors.map(d => (
+                    <div key={d.doctorId} className={`rx-dlist-item ${viewDoc?.doctorId === d.doctorId ? 'active' : ''}`} onClick={() => { setViewDoc(d); setQueueLoading(true); }}>
+                      <div className="rx-dlist-avatar">Dr</div>
+                      <div className="rx-dlist-meta">
+                        <h4>Dr. {d.fullName}</h4>
+                        <span>{d.specialistArea || 'General'}</span>
+                      </div>
+                      <div className="rx-dlist-fee">Rs.{d.consultationFee||0}</div>
+                    </div>
+                  ))}
+                  {doctors.length === 0 && <div className="rx-empty-state">No doctors.</div>}
+                </div>
+              </div>
+
+              <div className="rx-panel">
+                {viewDoc ? (
+                  <>
+                    <div className="rx-panel-head">
+                      <h3>Queue — Dr. {viewDoc.fullName}</h3>
+                      <input type="date" className="rx-date-picker" value={viewDate} onChange={e => { setViewDate(e.target.value); setQueueLoading(true); }} />
+                    </div>
+                    <div style={{overflowX:'auto'}}>
+                      {queueLoading ? (
+                        <div className="rx-empty-state">Loading queue...</div>
+                      ) : queue.length > 0 ? (
+                        <table className="rx-queue-table">
+                          <thead><tr><th>Token</th><th>Patient</th><th>Time</th><th>Status</th><th>Payment</th></tr></thead>
+                          <tbody>
+                            {queue.map(b => (
+                              <tr key={b.APPOINTMENT_ID}>
+                                <td><span className="rx-token-num">{b.TOKEN_NUMBER}</span></td>
+                                <td><strong style={{color:'var(--text)'}}>{b.PATIENT_NAME}</strong></td>
+                                <td>{new Date(b.APPOINTMENT_DATE).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</td>
+                                <td><span className={`rx-badge ${b.STATUS.toLowerCase()}`}>{b.STATUS}</span></td>
+                                <td><span className={`rx-badge ${b.PAYMENT_STATUS.toLowerCase()}`}>{b.PAYMENT_STATUS}</span></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <div className="rx-empty-state">No bookings for this date.</div>
                       )}
                     </div>
-
-                    <div className="form-group">
-                      <label>Internal Notes</label>
-                      <input type="text" value={apptData.notes} onChange={(e) => setApptData({ ...apptData, notes: e.target.value })} placeholder="Internal instructions..." />
-                    </div>
-
-                    <div className="payment-breakdown-section">
-                      <div className="payment-breakdown-title">💰 Payment Summary</div>
-                      <div className="payment-breakdown-fields">
-                        <div className="form-group">
-                          <label>Doctor Charges (Rs.)</label>
-                          <input
-                            type="number"
-                            value={apptData.doctorCharges}
-                            readOnly
-                            style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
-                            placeholder="Select doctor to view"
-                          />
-                        </div>
-                        <div className="form-group">
-                          <label>Hospital Charges (Rs.)</label>
-                          <input
-                            type="number"
-                            value={apptData.hospitalCharges}
-                            readOnly
-                            style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed' }}
-                            placeholder="Select doctor to view"
-                          />
-                        </div>
-                      </div>
-                      <div className="payment-breakdown-total">
-                        <span className="payment-total-label">Total Payment</span>
-                        <span className="payment-total-value">
-                          Rs. {((parseFloat(apptData.doctorCharges) || 0) + (parseFloat(apptData.hospitalCharges) || 0)).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button type="submit" className="btn-register-submit" disabled={actionLoading || !!availabilityWarning}>
-                      {actionLoading ? 'Booking...' : availabilityWarning ? 'Doctor Unavailable at This Time' : 'Confirm Appointment Slot'}
-                    </button>
-                    <button type="button" className="txt-btn" onClick={() => setSelectedPatient(null)}>Pick Different Patient</button>
-                  </form>
+                  </>
                 ) : (
-                  <div className="lock-notice" style={{ padding: '80px 20px' }}>Identify a patient profile first.</div>
+                  <div className="rx-panel-body"><div className="rx-empty-state">Select a doctor to see their token queue</div></div>
                 )}
               </div>
             </div>
           )}
 
-          {/* REGISTRY TAB */}
-          {activeTab === 'patients' && (
-            <div className="table-card full-width-card">
-              <div className="table-card-header">
-                <h2>Patient Medical Registry</h2>
-                <input type="text" placeholder="Filter registry..." className="table-search-input" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          {/* ════════ DIRECTORY ════════ */}
+          {tab === 'directory' && (
+            <div className="rx-panel">
+              <div className="rx-panel-head">
+                <h3>Patient Directory</h3>
+                <input className="rx-filter" placeholder="Filter by name or ID..." value={filter} onChange={e => setFilter(e.target.value)} />
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="patient-table">
-                  <thead>
-                    <tr><th>Patient Identity</th><th>Admitting Reason</th><th>Primary Physician</th><th>Contact Info</th></tr>
-                  </thead>
+              <div style={{overflowX:'auto'}}>
+                <table className="rx-queue-table">
+                  <thead><tr><th>Patient</th><th>Condition</th><th>Doctor</th><th>Contact</th></tr></thead>
                   <tbody>
-                    {loading ? <tr><td colSpan="4">Synchronizing database...</td></tr> :
-                      directoryResults.map(p => (
-                        <tr key={p.patientId}>
-                          <td>
-                            <div className="patient-info-cell">
-                              <div className="patient-avatar">{p.name?.[0] || 'P'}</div>
-                              <div className="patient-name-container">
-                                <span className="patient-name-text">{p.name}</span>
-                                <span className="patient-id-text">PT-{p.patientId} • {p.gender}</span>
-                              </div>
+                    {loading ? (
+                      <tr><td colSpan="4" style={{textAlign:'center', padding:30}}>Loading...</td></tr>
+                    ) : dirResults.map(p => (
+                      <tr key={p.patientId}>
+                        <td>
+                          <div className="rx-dir-cell">
+                            <div className="rx-dir-initials">{p.name?.[0] || 'P'}</div>
+                            <div className="rx-dir-details">
+                              <strong>{p.name}</strong>
+                              <small>PT-{p.patientId} · {p.gender}</small>
                             </div>
-                          </td>
-                          <td>{p.disease || 'Regular Checkup'}</td>
-                          <td>
-                            {p.doctorName ? (
-                              <span className="doc-chip">Dr. {p.doctorName}</span>
-                            ) : (
-                              <span className="un-chip">Awaiting assignment</span>
-                            )}
-                          </td>
-                          <td>{p.phoneNumber || p.email || 'N/A'}</td>
-                        </tr>
-                      ))}
+                          </div>
+                        </td>
+                        <td>{p.disease || 'Checkup'}</td>
+                        <td>{p.doctorName ? <span className="rx-chip doc">Dr. {p.doctorName}</span> : <span className="rx-chip none">Unassigned</span>}</td>
+                        <td>{p.phoneNumber || p.email || '—'}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
