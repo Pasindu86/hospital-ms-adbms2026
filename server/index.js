@@ -4,9 +4,15 @@ const dotenv = require('dotenv')
 const oracledb = require('oracledb')
 const path = require('path')
 const authRoutes = require('./routes/auth')
+const nurseRoutes = require('./routes/nurse')
+const adminRoutes = require('./routes/admin')
 const doctorRoutes = require('./routes/doctor')
+const pharmacistRoutes = require('./routes/pharmacist')
+const patientRoutes = require('./routes/patients')
+const receptionRoutes = require('./routes/reception')
 
 dotenv.config({ path: '.env.local' })
+
 
 const {
   DB_USER,
@@ -27,7 +33,9 @@ if (!DB_USER || !DB_PASSWORD || !DB_CONNECT_STRING) {
 }
 
 oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT
-
+// Return CLOB columns (e.g. MEDICAL_RECORD.CLINICAL_ADVICE) as plain strings
+// instead of Lob stream objects, so they serialize correctly in res.json().
+oracledb.fetchAsString = [oracledb.CLOB]
 const app = express()
 app.use(cors())
 app.use(express.json())
@@ -37,7 +45,13 @@ app.get('/api/health', (req, res) => {
 })
 
 app.use('/api/auth', authRoutes)
+app.use('/api/nurse', nurseRoutes)
+app.use('/api/admin', adminRoutes)
 app.use('/api/doctor', doctorRoutes)
+app.use('/api/pharmacist', pharmacistRoutes)
+app.use('/api/patients', patientRoutes)
+app.use('/api/reception', receptionRoutes)
+app.use("/api/pharmacy", require("./routes/pharmacyRoutes"));
 
 app.get('/api/users', async (req, res) => {
   let connection
@@ -106,7 +120,7 @@ async function start() {
       poolMax: 5,
       poolIncrement: 1,
     };
-    
+
     if (WALLET_DIR) {
       poolConfig.walletLocation = process.env.TNS_ADMIN;
     }
