@@ -1270,4 +1270,47 @@
   background: #f0fdf4;
   color: #15803d;
   border: 1px solid #bbf7d0;
+}
+
+/* ── Time slot picker ──────────────────────────────────────── */
+.slot-picker {
+  margin-top: 12px;
+}
+
+.slot-picker-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+}
+
+.slot-btn {
+  padding: 8px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.slot-btn:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.slot-btn.is-active {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
 }

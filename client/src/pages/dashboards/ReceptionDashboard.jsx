@@ -41,6 +41,7 @@ export default function ReceptionDashboard() {
   })
   const [docAvailability, setDocAvailability] = useState([])
   const [loadingAvail, setLoadingAvail] = useState(false)
+  const [bookDate, setBookDate] = useState('')
 
   // Safe user parsing from localStorage
   let user = { name: 'Staff', role: 'reception' }
@@ -135,6 +136,44 @@ export default function ReceptionDashboard() {
     }
   }
 
+  const todayStr = new Date().toISOString().slice(0, 10)
+
+  // The availability row for whatever date the receptionist picked
+  const bookDayNum = bookDate ? isoDay(bookDate) : null
+  const bookDayRow = bookDayNum ? docAvailability.find(d => d.day === bookDayNum) : null
+
+  // Build 30-minute time slots between the doctor's start/end hours for that day
+  const buildSlots = (start, end) => {
+    const slots = []
+    const toMin = (t) => parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3, 5), 10)
+    const pad = (n) => String(n).padStart(2, '0')
+    for (let m = toMin(start); m <= toMin(end); m += 30) {
+      slots.push(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`)
+    }
+    return slots
+  }
+
+  const timeSlots = (bookDayRow && !bookDayRow.off && bookDayRow.startTime && bookDayRow.endTime)
+    ? buildSlots(bookDayRow.startTime, bookDayRow.endTime)
+    : []
+
+  // When a doctor has no fixed schedule, fall back to a generic working-hours list
+  const fallbackSlots = (!hasSchedule && apptData.doctorId) ? buildSlots('08:00', '20:00') : []
+  const slotsToShow = hasSchedule ? timeSlots : fallbackSlots
+
+  const pickedTime = apptData.appointmentDate ? apptData.appointmentDate.slice(11, 16) : ''
+
+  const selectDate = (dateStr) => {
+    setBookDate(dateStr)
+    // Reset any previously picked time when the date changes
+    setApptData(prev => ({ ...prev, appointmentDate: '' }))
+  }
+
+  const selectSlot = (time) => {
+    if (!bookDate) return
+    setApptData(prev => ({ ...prev, appointmentDate: `${bookDate}T${time}` }))
+  }
+
   const handleRegSubmit = async (e) => {
     e.preventDefault()
     setActionLoading(true)
@@ -184,6 +223,7 @@ export default function ReceptionDashboard() {
       setSelectedPatient(null)
       setApptData({ doctorId: '', appointmentDate: '', notes: '', doctorCharges: '', hospitalCharges: '' })
       setDocAvailability([])
+      setBookDate('')
       setPatientSearch('')
       fetchPatients()
     } catch (err) {
@@ -363,6 +403,7 @@ export default function ReceptionDashboard() {
                             doctorCharges: doc ? doc.consultationFee : '',
                             hospitalCharges: doc && doc.hospitalCharge ? doc.hospitalCharge : (id ? '500' : '')
                           });
+                          setBookDate('');
                           fetchDoctorAvailability(id);
                         }}
                         required>
@@ -404,12 +445,45 @@ export default function ReceptionDashboard() {
 
                     <div className="form-group">
                       <label>Appointment Date & Time</label>
-                      <input type="datetime-local" value={apptData.appointmentDate} onChange={(e) => setApptData({ ...apptData, appointmentDate: e.target.value })} required />
+                      <input
+                        type="date"
+                        min={todayStr}
+                        value={bookDate}
+                        onChange={(e) => selectDate(e.target.value)}
+                        required
+                      />
+
+                      {bookDate && (
+                        <>
+                          {hasSchedule && (!bookDayRow || bookDayRow.off) ? (
+                            <div className="availability-inline warn">⚠ The doctor is not available on {new Date(bookDate + 'T00:00').toLocaleDateString(undefined, { weekday: 'long' })}. Please pick another date.</div>
+                          ) : slotsToShow.length > 0 ? (
+                            <div className="slot-picker">
+                              <div className="slot-picker-head">
+                                Available times{bookDayRow && !bookDayRow.off ? ` (${bookDayRow.startTime}–${bookDayRow.endTime})` : ''}:
+                              </div>
+                              <div className="slot-grid">
+                                {slotsToShow.map(t => (
+                                  <button
+                                    type="button"
+                                    key={t}
+                                    className={`slot-btn ${pickedTime === t ? 'is-active' : ''}`}
+                                    onClick={() => selectSlot(t)}
+                                  >
+                                    {t}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </>
+                      )}
+
                       {availabilityWarning && (
                         <div className="availability-inline warn">⚠ {availabilityWarning}</div>
                       )}
-                      {!availabilityWarning && apptData.doctorId && hasSchedule && apptData.appointmentDate && selectedDayRow && !selectedDayRow.off && (
-                        <div className="availability-inline ok">✓ Within {selectedDayRow.label} hours ({selectedDayRow.startTime}–{selectedDayRow.endTime}).</div>
+                      {!availabilityWarning && apptData.appointmentDate && (
+                        <div className="availability-inline ok">✓ Booking {new Date(apptData.appointmentDate).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })} at {pickedTime}.</div>
                       )}
                     </div>
 
