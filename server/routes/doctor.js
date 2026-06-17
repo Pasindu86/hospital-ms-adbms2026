@@ -30,7 +30,7 @@ async function getDoctorId(connection, staffId) {
   const result = await connection.execute(
     `SELECT d.DOCTOR_ID
      FROM DOCTOR d
-     JOIN USER_AUTH u ON u.FULL_NAME = d.NAME
+     JOIN USER_AUTH u ON u.USER_ID = d.DOCTOR_ID
      WHERE u.STAFF_ID = :sid AND u.ROLE = 'doctor'`,
     { sid: staffId }
   )
@@ -61,13 +61,14 @@ router.get('/appointments/today', async (req, res) => {
          p.DISEASE,
          a.APPOINTMENT_DATE,
          a.STATUS,
-         a.NOTES,
-         a.SYMPTOMS
+         a.NOTES
        FROM PATIENT_DOCTOR_APPOINTMENT a
-       JOIN PATIENT p ON a.PATIENT_ID = p.PATIENT_ID
+       JOIN PATIENTS p ON a.PATIENT_ID = p.PATIENT_ID
        WHERE a.DOCTOR_ID = :doctorId
          AND TRUNC(a.APPOINTMENT_DATE) = TRUNC(SYSDATE)
-       ORDER BY a.APPOINTMENT_DATE ASC`,
+       ORDER BY
+         CASE WHEN a.STATUS = 'Completed' THEN 1 ELSE 0 END ASC,
+         a.APPOINTMENT_DATE ASC`,
       { doctorId }
     )
     res.json({ appointments: result.rows })
@@ -94,7 +95,7 @@ router.get('/patients/search', async (req, res) => {
     connection = await oracledb.getConnection()
     const result = await connection.execute(
       `SELECT PATIENT_ID, NAME, EMAIL, PHONE_NUMBER, GENDER, DATE_OF_BIRTH, DISEASE
-       FROM PATIENT
+       FROM PATIENTS
        WHERE UPPER(NAME) LIKE '%' || UPPER(:q) || '%'
           OR TO_CHAR(PATIENT_ID) = :q
           OR PHONE_NUMBER LIKE '%' || :q || '%'
@@ -169,38 +170,6 @@ router.get('/patients/:id/history', async (req, res) => {
     res.json({ records: result.rows, prescriptions })
   } catch (error) {
     console.error('GET /patients/:id/history failed', error)
-    res.status(500).json({ error: 'Database error' })
-  } finally {
-    if (connection) try { await connection.close() } catch (e) { /* ignore */ }
-  }
-})
-
-// ═══════════════════════════════════════════════════════════
-//  GET /patients/:id/lab-reports
-//  Get patient's lab test results
-// ═══════════════════════════════════════════════════════════
-router.get('/patients/:id/lab-reports', async (req, res) => {
-  const patientId = Number(req.params.id)
-  let connection
-  try {
-    connection = await oracledb.getConnection()
-    const result = await connection.execute(
-      `SELECT
-         lr.REPORT_ID,
-         lr.TEST_NAME,
-         lr.TEST_RESULT,
-         lr.STATUS,
-         lr.REPORT_DATE,
-         d.NAME AS DOCTOR_NAME
-       FROM LAB_REPORT lr
-       LEFT JOIN DOCTOR d ON lr.DOCTOR_ID = d.DOCTOR_ID
-       WHERE lr.PATIENT_ID = :patientId
-       ORDER BY lr.REPORT_DATE DESC`,
-      { patientId }
-    )
-    res.json({ labReports: result.rows })
-  } catch (error) {
-    console.error('GET /patients/:id/lab-reports failed', error)
     res.status(500).json({ error: 'Database error' })
   } finally {
     if (connection) try { await connection.close() } catch (e) { /* ignore */ }

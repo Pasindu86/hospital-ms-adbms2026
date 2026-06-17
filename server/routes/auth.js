@@ -91,9 +91,9 @@ router.get('/me', async (req, res) => {
 })
 
 router.post('/register', async (req, res) => {
-  const { staffId, fullName, email, password, role } = req.body
+  const { fullName, email, password, role } = req.body
 
-  if (!staffId || !fullName || !password || !role) {
+  if (!fullName || !password || !role) {
     return res.status(400).json({ error: 'Missing required fields' })
   }
 
@@ -101,10 +101,21 @@ router.post('/register', async (req, res) => {
   try {
     const hash = await bcrypt.hash(password, 10)
     connection = await oracledb.getConnection()
+    
+    const maxIdRes = await connection.execute(
+      `SELECT NVL(MAX(TO_NUMBER(REGEXP_REPLACE(staff_id, '[^0-9]', ''))), 0) + 1 AS next_id 
+       FROM user_auth WHERE role = :role`,
+      { role: role }
+    );
+    const nextId = maxIdRes.rows[0].NEXT_ID || 1;
+    const prefixMap = { doctor: 'D', nurse: 'N', pharmacist: 'P', reception: 'R', admin: 'A', patient: 'PT' };
+    const prefix = prefixMap[role] || 'S';
+    const generatedStaffId = prefix + String(nextId).padStart(3, '0');
+
     await connection.execute(
-      `INSERT INTO user_auth (staff_id, full_name, email, password_hash, role)
-       VALUES (:staffId, :fullName, :email, :hash, :role)`,
-      { staffId, fullName, email: email || null, hash, role },
+      `INSERT INTO user_auth (staff_id, full_name, email, password_hash, role, is_active)
+       VALUES (:staffId, :fullName, :email, :hash, :role, 1)`,
+      { staffId: generatedStaffId, fullName, email: email || null, hash, role },
       { autoCommit: true }
     )
     res.status(201).json({ message: 'User registered successfully' })

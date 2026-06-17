@@ -1,0 +1,446 @@
+/* NurseDashboard.css - Clean Duty-Focused Layout */
+
+:root {
+    --nurse-primary: #0ea5e9;
+    --nurse-primary-light: rgba(14, 165, 233, 0.08);
+    --nurse-secondary: #6366f1;
+    --nurse-secondary-light: rgba(99, 102, 241, 0.08);
+    --nurse-accent: #f59e0b;
+    --nurse-bg: #f8fafc;
+    --nurse-card: #ffffff;
+    --nurse-text-main: #1e293b;
+    --nurse-text-muted: #64748b;
+    --nurse-border: #e2e8f0;
+    --nurse-success: #10b981;
+}
+
+.nurse-layout {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--nurse-bg);
+    color: var(--nurse-text-main);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Sidebar */
+.nurse-sidebar {
+    width: 260px;
+    background-color: #ffffff;
+    border-right: 1px solid var(--nurse-border);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+}
+
+.nurse-sidebar-brand {
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--nurse-border);
+}
+
+.nurse-brand-icon {
+    background: linear-gradient(135deg, var(--nurse-primary), var(--nurse-secondary));
+    color: white;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+}
+
+.nurse-sidebar-nav {
+    flex: 1;
+    padding: 1.5rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.nurse-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    color: var(--nurse-text-muted);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+}
+
+.nurse-nav-item:hover {
+    background-color: #f1f5f9;
+    color: var(--nurse-primary);
+}
+
+.nurse-nav-item.active {
+    background-color: var(--nurse-primary-light);
+    color: var(--nurse-primary);
+    font-weight: 600;
+}
+
+.logout-btn {
+    margin-top: auto;
+    padding: 1rem;
+    border-top: 1px solid var(--nurse-border);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #ef4444;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    font-weight: 600;
+}
+
+.logout-btn:hover {
+    background-color: #fef2f2;
+}
+
+/* Main Area */
+.nurse-main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 2rem 2.5rem;
+    gap: 2rem;
+    max-width: 1200px;
+}
+
+.nurse-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nurse-welcome {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--nurse-text-main);
+}
+
+.nurse-subtitle {
+    color: var(--nurse-text-muted);
+    margin-top: 0.25rem;
+    font-size: 0.925rem;
+}
+
+.nurse-nurse-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.nurse-avatar-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--nurse-primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+}
+
+.nurse-error-msg {
+    background: #fef2f2;
+    color: #ef4444;
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid #fee2e2;
+}
+
+/* Today's Duty Section */
+.today-duty-section {
+    background: var(--nurse-card);
+    border-radius: 16px;
+    border: 2px solid var(--nurse-primary);
+    box-shadow: 0 4px 16px rgba(14, 165, 233, 0.1);
+    overflow: hidden;
+}
+
+.today-duty-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    background: var(--nurse-primary-light);
+    border-bottom: 1px solid rgba(14, 165, 233, 0.15);
+}
+
+.today-duty-header h2 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--nurse-text-main);
+}
+
+.today-badge {
+    background: var(--nurse-primary);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.today-duty-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--nurse-border);
+}
+
+.today-duty-card {
+    padding: 1.5rem;
+    background: white;
+}
+
+.today-duty-card h3 {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0.75rem 0 1rem;
+    color: var(--nurse-text-muted);
+}
+
+.today-duty-card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--nurse-primary-light);
+    color: var(--nurse-primary);
+}
+
+.today-duty-card-icon.ward-icon {
+    background: var(--nurse-secondary-light);
+    color: var(--nurse-secondary);
+}
+
+.today-allocation-item {
+    padding: 0.75rem;
+    background: var(--nurse-bg);
+    border-radius: 10px;
+    margin-bottom: 0.5rem;
+}
+
+.today-allocation-name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--nurse-text-main);
+}
+
+.today-allocation-detail {
+    font-size: 0.8rem;
+    color: var(--nurse-text-muted);
+    margin-top: 0.25rem;
+}
+
+.today-allocation-shift {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--nurse-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.today-no-duty {
+    color: var(--nurse-text-muted);
+    font-size: 0.875rem;
+    padding: 1rem 0;
+}
+
+.today-no-duty-full {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: var(--nurse-text-muted);
+    gap: 0.75rem;
+}
+
+.today-no-duty-full p {
+    font-size: 1rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* All Duties Grid */
+.duties-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.duty-panel {
+    background: var(--nurse-card);
+    border-radius: 16px;
+    border: 1px solid var(--nurse-border);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+}
+
+.duty-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--nurse-border);
+}
+
+.duty-panel-header h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.duty-count-badge {
+    background: var(--nurse-primary-light);
+    color: var(--nurse-primary);
+    padding: 0.25rem 0.6rem;
+    border-radius: 50px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.duty-count-badge.ward-badge {
+    background: var(--nurse-secondary-light);
+    color: var(--nurse-secondary);
+}
+
+.duty-list {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 450px;
+    overflow-y: auto;
+}
+
+.duty-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--nurse-border);
+    transition: all 0.2s;
+}
+
+.duty-card:hover {
+    border-color: var(--nurse-primary);
+    background: var(--nurse-primary-light);
+}
+
+.doctor-duty-card:hover {
+    border-color: var(--nurse-primary);
+    background: var(--nurse-primary-light);
+}
+
+.ward-duty-card:hover {
+    border-color: var(--nurse-secondary);
+    background: var(--nurse-secondary-light);
+}
+
+.duty-card-date {
+    background: var(--nurse-bg);
+    padding: 0.4rem 0.6rem;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--nurse-text-muted);
+    white-space: nowrap;
+    min-width: 80px;
+    text-align: center;
+}
+
+.duty-card-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.duty-card-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--nurse-text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.duty-card-detail {
+    font-size: 0.75rem;
+    color: var(--nurse-text-muted);
+    margin-top: 0.15rem;
+}
+
+.duty-card-shift {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--nurse-primary);
+    white-space: nowrap;
+}
+
+.ward-duty-card .duty-card-shift {
+    color: var(--nurse-secondary);
+}
+
+.duty-empty {
+    text-align: center;
+    color: var(--nurse-text-muted);
+    padding: 2rem 1rem;
+    font-size: 0.875rem;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .today-duty-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .duties-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .nurse-sidebar {
+        display: none;
+    }
+
+    .nurse-main-area {
+        padding: 1.5rem;
+    }
+
+    .nurse-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .nurse-welcome {
+        font-size: 1.4rem;
+    }
+}

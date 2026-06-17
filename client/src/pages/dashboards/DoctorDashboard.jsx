@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import './DoctorDashboard.css'
+import './AdminDashboard.css'
 
 const API = 'http://localhost:5000/api/doctor'
 
@@ -97,7 +98,6 @@ export default function DoctorDashboard() {
   const [selectedAppt, setSelectedAppt] = useState(null)
   const [history, setHistory] = useState([])
   const [prescriptionHistory, setPrescriptionHistory] = useState([])
-  const [labReports, setLabReports] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -144,44 +144,33 @@ export default function DoctorDashboard() {
     setMedItems([])
     setMessage({ type: '', text: '' })
 
-    // Fetch history & lab reports
-    try {
-      const [histRes, labRes] = await Promise.all([
-        axios.get(`${API}/patients/${appt.PATIENT_ID}/history`, { headers: getAuthHeaders() }),
-        axios.get(`${API}/patients/${appt.PATIENT_ID}/lab-reports`, { headers: getAuthHeaders() })
-      ])
-      setHistory(histRes.data.records || [])
-      setPrescriptionHistory(histRes.data.prescriptions || [])
-      setLabReports(labRes.data.labReports || [])
-    } catch (err) {
-      console.error('Failed to load patient data', err)
-    }
+    // Fetch history
+    await loadPatientData(appt.PATIENT_ID)
   }
 
-  // Select from search results
+  // Load a patient's records & prescriptions
+  const loadPatientData = async (patientId) => {
+    setLoading(true)
+    try {
+      const histRes = await axios.get(`${API}/patients/${patientId}/history`, { headers: getAuthHeaders() })
+      setHistory(histRes.data.records || [])
+      setPrescriptionHistory(histRes.data.prescriptions || [])
+    } catch (err) {
+      console.error('Failed to load patient data', err)
+      setHistory([])
+      setPrescriptionHistory([])
+    } finally { setLoading(false) }
+  }
+
+  // Select from the top-bar search results — opens read-only history
   const selectSearchPatient = async (patient) => {
     setSelectedPatient({ id: patient.PATIENT_ID, name: patient.NAME, gender: patient.GENDER })
     setSelectedAppt(null)
-    setView('examination')
+    setView('history')
     setSearchResults([])
     setSearchQuery('')
-    setDiagnosis('')
-    setClinicalAdvice('')
-    setTreatmentNotes('')
-    setMedItems([])
     setMessage({ type: '', text: '' })
-
-    try {
-      const [histRes, labRes] = await Promise.all([
-        axios.get(`${API}/patients/${patient.PATIENT_ID}/history`, { headers: getAuthHeaders() }),
-        axios.get(`${API}/patients/${patient.PATIENT_ID}/lab-reports`, { headers: getAuthHeaders() })
-      ])
-      setHistory(histRes.data.records || [])
-      setPrescriptionHistory(histRes.data.prescriptions || [])
-      setLabReports(labRes.data.labReports || [])
-    } catch (err) {
-      console.error('Failed to load patient data', err)
-    }
+    await loadPatientData(patient.PATIENT_ID)
   }
 
   // Prescription builder
@@ -273,33 +262,49 @@ export default function DoctorDashboard() {
 
   // ─── Render ──────────────────────────────────────────────
   return (
-    <div className="doctor-layout">
+    <div className="admin-layout">
       {/* Sidebar */}
-      <aside className="doctor-sidebar">
+      <aside className="sidebar">
         <div className="sidebar-brand">
-          <h2><span className="brand-icon">✙</span> CarePulse</h2>
-          <div className="brand-subtitle">Doctor Portal</div>
+          <div className="sidebar-brand-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.503 4.045 3 5.5L12 21l7-7Z" /></svg>
+          </div>
+          <div className="sidebar-brand-text">
+            <h2>CarePulse</h2>
+            <span>Doctor Portal</span>
+          </div>
         </div>
         <nav className="sidebar-nav">
-          <button className={`nav-item ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>
-            <span className="nav-icon">📋</span> Dashboard
+          <button className={`sidebar-nav-item ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" /></svg>
+            </span>
+            <span className="nav-label">Dashboard</span>
           </button>
-          <button className={`nav-item ${view === 'examination' ? 'active' : ''}`} onClick={() => selectedPatient && setView('examination')}>
-            <span className="nav-icon">🩺</span> Examination
+          <button className={`sidebar-nav-item ${view === 'history' ? 'active' : ''}`} onClick={() => setView('history')}>
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+            </span>
+            <span className="nav-label">Patient History</span>
           </button>
         </nav>
-        <div className="sidebar-footer">
-          <button className="logout-nav-btn" onClick={handleLogout}>
-            <span className="nav-icon">🚪</span> Logout
+        <div className="sidebar-bottom">
+          <button className="sidebar-bottom-item logout" onClick={handleLogout}>
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
+            </span>
+            Logout
           </button>
         </div>
       </aside>
 
-      {/* Main */}
-      <div className="doctor-main">
-        <header className="main-header">
-          <div className="header-search">
-            <span className="search-icon">🔍</span>
+      {/* Main Area */}
+      <div className="main-area">
+        <header className="topbar">
+          <div className="topbar-search" style={{ position: 'relative' }}>
+            <span className="search-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+            </span>
             <input
               type="text"
               placeholder="Search patient (Name, ID, Phone)..."
@@ -317,69 +322,77 @@ export default function DoctorDashboard() {
               </div>
             )}
           </div>
-          <div className="header-right">
-            <div className="doctor-profile">
-              <div className="profile-avatar">{getInitials(user.name)}</div>
-              <div className="profile-info">
-                <div className="profile-name">{user.name || 'Doctor'}</div>
-                <div className="profile-role">Doctor</div>
+          <div className="topbar-right">
+            <div className="user-profile">
+              <div className="topbar-avatar">{getInitials(user.name)}</div>
+              <div className="user-info">
+                <span className="user-name">{user.name || 'Doctor'}</span>
+                <span className="user-role">Doctor</span>
               </div>
             </div>
           </div>
         </header>
 
-        <div className="main-content">
+        <main className="page-content">
           {/* ─── DASHBOARD VIEW ──────────────────────── */}
           {view === 'dashboard' && (
             <>
-              <div className="page-title-section">
-                <h1>Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'}, Dr. {(user.name || '').split(' ').pop()}</h1>
-                <p>Here's your schedule for today — {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+              <div className="page-title-row">
+                <div className="page-title">
+                  <h1>Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 17 ? 'Afternoon' : 'Evening'}, Dr. {(user.name || '').split(' ').pop()}</h1>
+                  <p>Here's your schedule for today — {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                </div>
               </div>
 
               {/* Stats */}
-              <div className="stats-row">
+              <div className="stat-cards">
                 <div className="stat-card">
-                  <div className="stat-icon blue">👥</div>
+                  <div className="stat-icon blue">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                  </div>
                   <div className="stat-info">
-                    <div className="stat-value">{totalToday}</div>
                     <div className="stat-label">Patients Today</div>
+                    <div className="stat-value">{totalToday}</div>
                   </div>
                 </div>
                 <div className="stat-card">
-                  <div className="stat-icon amber">⏳</div>
+                  <div className="stat-icon amber">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
+                  </div>
                   <div className="stat-info">
-                    <div className="stat-value">{pending}</div>
                     <div className="stat-label">Pending Consultations</div>
+                    <div className="stat-value">{pending}</div>
                   </div>
                 </div>
                 <div className="stat-card">
-                  <div className="stat-icon green">✅</div>
+                  <div className="stat-icon green">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                  </div>
                   <div className="stat-info">
-                    <div className="stat-value">{completed}</div>
                     <div className="stat-label">Completed Exams</div>
+                    <div className="stat-value">{completed}</div>
                   </div>
                 </div>
               </div>
 
               {/* Appointment Queue */}
-              <div className="doc-card">
-                <div className="doc-card-header">
-                  <h3>📋 Today's Appointment Queue</h3>
+              <div className="table-card">
+                <div className="table-card-header">
+                  <h2>Today's Appointment Queue</h2>
                   <button className="start-exam-btn primary" onClick={fetchAppointments} style={{ fontSize: '12px', padding: '6px 14px' }}>
                     Refresh
                   </button>
                 </div>
-                <div className="doc-card-body">
+                <div className="table-card-body" style={{ padding: 0 }}>
                   {loading ? (
                     <div className="loading-container"><div className="spinner"></div><p>Loading queue...</p></div>
                   ) : appointments.length === 0 ? (
                     <div className="empty-state">
-                      <div className="empty-icon">📭</div>
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto 12px', color: '#94a3b8', display: 'block' }}><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
                       <p>No appointments scheduled for today.</p>
                     </div>
                   ) : (
-                    <table className="queue-table">
+                    <table className="staff-table">
                       <thead>
                         <tr>
                           <th>Patient</th>
@@ -433,80 +446,55 @@ export default function DoctorDashboard() {
           {/* ─── EXAMINATION VIEW ────────────────────── */}
           {view === 'examination' && selectedPatient && (
             <>
-              <div className="page-title-section">
-                <h1>Patient: {selectedPatient.name}</h1>
-                <p>Patient ID: #{selectedPatient.id}{selectedAppt ? ` · Appointment: ${formatDate(selectedAppt.APPOINTMENT_DATE)}` : ''}</p>
+              <div className="page-title-row">
+                <div className="page-title">
+                  <h1>Patient: {selectedPatient.name}</h1>
+                  <p>Patient ID: #{selectedPatient.id}{selectedAppt ? ` · Appointment: ${formatDate(selectedAppt.APPOINTMENT_DATE)}` : ''}</p>
+                </div>
               </div>
 
-              {/* Split Viewer: History + Lab Reports */}
-              <div className="split-viewer">
-                {/* Left — Medical History */}
-                <div className="viewer-panel">
-                  <div className="viewer-panel-header">
-                    <h4>📄 Medical History</h4>
-                  </div>
-                  <div className="viewer-panel-body">
-                    {history.length === 0 ? (
-                      <div className="no-selection-msg">
-                        <div className="msg-icon">📋</div>
-                        <p>No previous medical records found.</p>
-                      </div>
-                    ) : (
-                      history.map(r => (
-                        <div key={r.RECORD_ID} className="record-item">
-                          <div className="record-date">{formatDate(r.RECORD_DATE)}</div>
-                          <div className="record-diagnosis">{r.DIAGNOSIS}</div>
-                          <div className="record-notes">{r.TREATMENT_NOTES}</div>
-                          {r.CLINICAL_ADVICE && <div className="record-notes" style={{ marginTop: 4, fontStyle: 'italic' }}>Advice: {r.CLINICAL_ADVICE}</div>}
-                          <div className="record-doctor">Dr. {r.DOCTOR_NAME} — {r.SPECIALIST_AREA}</div>
-                          {/* Show prescriptions for this record */}
-                          {prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID).length > 0 && (
-                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
-                              <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>PRESCRIBED:</div>
-                              {prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID).map(p => (
-                                <div key={p.ITEM_ID} style={{ fontSize: 12, color: '#475569', marginBottom: 2 }}>
-                                  💊 {p.DRUG_NAME} — {p.DOSAGE} · {p.DURATION}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
+              {/* Medical History */}
+              <div className="table-card" style={{ marginBottom: 24 }}>
+                <div className="table-card-header">
+                  <h2>Medical History</h2>
                 </div>
-
-                {/* Right — Lab Reports */}
-                <div className="viewer-panel">
-                  <div className="viewer-panel-header">
-                    <h4>🧪 Lab Reports</h4>
-                  </div>
-                  <div className="viewer-panel-body">
-                    {labReports.length === 0 ? (
-                      <div className="no-selection-msg">
-                        <div className="msg-icon">🧪</div>
-                        <p>No lab reports available.</p>
-                      </div>
-                    ) : (
-                      labReports.map(lr => (
-                        <div key={lr.REPORT_ID} className="lab-item">
-                          <div>
-                            <div className="lab-test-name">{lr.TEST_NAME}</div>
-                            <div className="lab-date">{formatDate(lr.REPORT_DATE)}{lr.DOCTOR_NAME ? ` · Dr. ${lr.DOCTOR_NAME}` : ''}</div>
+                <div className="viewer-panel-body">
+                  {history.length === 0 ? (
+                    <div className="no-selection-msg">
+                      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto 12px', color: '#cbd5e1', display: 'block' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" x2="8" y1="13" y2="13" /><line x1="16" x2="8" y1="17" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
+                      <p>No previous medical records found.</p>
+                    </div>
+                  ) : (
+                    history.map(r => (
+                      <div key={r.RECORD_ID} className="record-item">
+                        <div className="record-date">{formatDate(r.RECORD_DATE)}</div>
+                        <div className="record-diagnosis">{r.DIAGNOSIS}</div>
+                        <div className="record-notes">{r.TREATMENT_NOTES}</div>
+                        {r.CLINICAL_ADVICE && <div className="record-notes" style={{ marginTop: 4, fontStyle: 'italic' }}>Advice: {r.CLINICAL_ADVICE}</div>}
+                        <div className="record-doctor">Dr. {r.DOCTOR_NAME} — {r.SPECIALIST_AREA}</div>
+                        {/* Show prescriptions for this record */}
+                        {prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID).length > 0 && (
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>PRESCRIBED:</div>
+                            {prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID).map(p => (
+                              <div key={p.ITEM_ID} style={{ fontSize: 12, color: '#475569', marginBottom: 2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.5 20.5 4 14l6.5-6.5a4.95 4.95 0 1 1 7 7Z"/><path d="m14 10.5 6.5-6.5a4.95 4.95 0 1 0-7-7Z"/></svg>
+                                {p.DRUG_NAME} — {p.DOSAGE} · {p.DURATION}
+                              </div>
+                            ))}
                           </div>
-                          <span className={`lab-status ${(lr.STATUS || '').toLowerCase()}`}>{lr.STATUS}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
               {/* Treatment & Advice Entry Form */}
               {selectedAppt && selectedAppt.STATUS !== 'Completed' && (
-                <div className="doc-card treatment-section">
-                  <div className="doc-card-header">
-                    <h3>🩺 Treatment & Advice Entry</h3>
+                <div className="table-card treatment-section">
+                  <div className="table-card-header">
+                    <h2>Treatment & Advice Entry</h2>
                   </div>
                   <div className="treatment-form">
                     {message.text && (
@@ -551,7 +539,7 @@ export default function DoctorDashboard() {
                     {/* Prescription Builder */}
                     <div className="prescription-builder">
                       <div className="prescription-header">
-                        <h4>💊 Prescription Builder</h4>
+                        <h2 style={{ fontSize: '16px', margin: 0, color: '#0f172a' }}>Prescription Builder</h2>
                         <button type="button" className="add-med-btn" onClick={addMedicine}>
                           + Add Medicine
                         </button>
@@ -596,7 +584,7 @@ export default function DoctorDashboard() {
 
                     <div className="form-actions">
                       <button className="save-btn primary" onClick={handleSaveTreatment} disabled={saving}>
-                        {saving ? 'Saving...' : '💾 Save Treatment & Prescription'}
+                        {saving ? 'Saving...' : 'Save Treatment & Prescription'}
                       </button>
                     </div>
                   </div>
@@ -615,7 +603,94 @@ export default function DoctorDashboard() {
               </div>
             </>
           )}
-        </div>
+
+          {/* ─── PATIENT HISTORY VIEW ─────────────────── */}
+          {view === 'history' && (
+            <>
+              <div className="page-title-row">
+                <div className="page-title">
+                  <h1>Patient Medical History</h1>
+                  <p>Search a patient above to review their previous treatment records, advice and prescribed medicines.</p>
+                </div>
+              </div>
+
+              {!selectedPatient ? (
+                <div className="table-card">
+                  <div className="table-card-body" style={{ padding: '48px 24px', textAlign: 'center' }}>
+                    <div className="empty-state">
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto 12px', color: '#94a3b8', display: 'block' }}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                      <p style={{ color: '#94a3b8' }}>Use the search bar at the top to find a patient by name, ID or phone number.</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="table-card" style={{ marginBottom: 16 }}>
+                    <div className="table-card-body" style={{ padding: '16px 20px' }}>
+                      <div className="patient-cell">
+                        <div className={`patient-avatar ${(selectedPatient.gender || 'other').toLowerCase()}`}>
+                          {getInitials(selectedPatient.name)}
+                        </div>
+                        <div className="patient-details">
+                          <div className="p-name">{selectedPatient.name}</div>
+                          <div className="p-id">ID: #{selectedPatient.id}{selectedPatient.gender ? ` · ${selectedPatient.gender}` : ''}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {loading ? (
+                    <div className="loading-container"><div className="spinner"></div><p>Loading patient records...</p></div>
+                  ) : (
+                    <div className="table-card">
+                      <div className="table-card-header">
+                        <h2>Medical History — Treatment, Advice & Medicines</h2>
+                      </div>
+                      <div className="viewer-panel-body">
+                        {history.length === 0 ? (
+                          <div className="no-selection-msg">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto 12px', color: '#cbd5e1', display: 'block' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" x2="8" y1="13" y2="13" /><line x1="16" x2="8" y1="17" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
+                            <p>No previous medical records found.</p>
+                          </div>
+                        ) : (
+                          history.map(r => (
+                            <div key={r.RECORD_ID} className="record-item">
+                              <div className="record-date">{formatDate(r.RECORD_DATE)}</div>
+                              <div className="record-diagnosis">Diagnosis: {r.DIAGNOSIS}</div>
+                              {r.TREATMENT_NOTES && (
+                                <div className="record-notes" style={{ marginTop: 4 }}>
+                                  <strong>Treatment:</strong> {r.TREATMENT_NOTES}
+                                </div>
+                              )}
+                              {r.CLINICAL_ADVICE && (
+                                <div className="record-notes" style={{ marginTop: 4, fontStyle: 'italic' }}>
+                                  <strong>Advice:</strong> {r.CLINICAL_ADVICE}
+                                </div>
+                              )}
+                              <div className="record-doctor">Dr. {r.DOCTOR_NAME} — {r.SPECIALIST_AREA}</div>
+                              {/* Prescribed medicines for this record */}
+                              {prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID).length > 0 && (
+                                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>PRESCRIBED MEDICINES:</div>
+                                  {prescriptionHistory.filter(p => p.RECORD_ID === r.RECORD_ID).map(p => (
+                                    <div key={p.ITEM_ID} style={{ fontSize: 12, color: '#475569', marginBottom: 2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.5 20.5 4 14l6.5-6.5a4.95 4.95 0 1 1 7 7Z"/><path d="m14 10.5 6.5-6.5a4.95 4.95 0 1 0-7-7Z"/></svg>
+                                      {p.DRUG_NAME} — {p.DOSAGE} · {p.DURATION}{p.INSTRUCTIONS ? ` · ${p.INSTRUCTIONS}` : ''}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        </main>
       </div>
     </div>
   )
