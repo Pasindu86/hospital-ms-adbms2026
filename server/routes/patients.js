@@ -49,6 +49,48 @@ router.get('/doctors', authenticateToken, async (req, res) => {
   }
 })
 
+// GET a doctor's weekly availability (all 7 days)
+router.get('/doctors/:id/availability', authenticateToken, async (req, res) => {
+  const DAY_LABELS = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  let connection
+  try {
+    connection = await oracledb.getConnection()
+    const result = await connection.execute(
+      `SELECT day_of_week, start_time, end_time
+       FROM doctor_availability
+       WHERE doctor_id = :id
+       ORDER BY day_of_week ASC`,
+      { id: req.params.id }
+    )
+
+    const byDay = {}
+    for (const row of result.rows) {
+      byDay[row.DAY_OF_WEEK] = { startTime: row.START_TIME, endTime: row.END_TIME }
+    }
+
+    const days = []
+    for (let d = 1; d <= 7; d++) {
+      const set = byDay[d]
+      days.push({
+        day: d,
+        label: DAY_LABELS[d],
+        off: !set,
+        startTime: set ? set.startTime : '',
+        endTime: set ? set.endTime : ''
+      })
+    }
+
+    res.json({ availability: days })
+  } catch (error) {
+    console.error('GET /api/patients/doctors/:id/availability failed', error)
+    res.status(500).json({ error: 'Failed to fetch availability' })
+  } finally {
+    if (connection) {
+      try { await connection.close() } catch (e) { /* ignore */ }
+    }
+  }
+})
+
 // GET all patients
 router.get('/', authenticateToken, async (req, res) => {
   let connection
@@ -184,6 +226,10 @@ router.post('/appointment', authenticateToken, async (req, res) => {
          v_doctor_name VARCHAR2(100);
          v_payment_id NUMBER;
        BEGIN
+         IF PKG_DOCTOR_AVAILABILITY.FN_IS_WITHIN_AVAILABILITY(:doctorId, :appointmentDate) = 0 THEN
+           RAISE_APPLICATION_ERROR(-20010, 'Doctor is not available at the selected day/time');
+         END IF;
+
          SELECT name INTO v_patient_name FROM patients WHERE patient_id = :patientId;
          SELECT name INTO v_doctor_name FROM doctor WHERE doctor_id = :doctorId;
          
@@ -230,6 +276,9 @@ router.post('/appointment', authenticateToken, async (req, res) => {
     res.status(200).json({ message: 'Appointment booked successfully' })
   } catch (error) {
     console.error('POST /api/patients/appointment failed', error)
+    if (error.message && error.message.includes('ORA-20010')) {
+      return res.status(400).json({ error: 'Doctor is not available at the selected day/time' })
+    }
     res.status(500).json({ error: 'Database error booking appointment: ' + error.message })
   } finally {
     if (connection) {
