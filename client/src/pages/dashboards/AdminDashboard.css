@@ -409,9 +409,7 @@ body {
 
 /* Content Grid */
 .content-grid {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 24px;
+  display: block;
 }
 
 .table-card,
@@ -651,15 +649,19 @@ body {
   justify-content: center;
   z-index: 200;
   backdrop-filter: blur(4px);
+  padding: 20px;
 }
 
 .modal-content {
   background: #fff;
   width: 100%;
-  max-width: 500px;
+  max-width: 650px;
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 40px);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
 }
 
 .modal-header {
@@ -672,6 +674,28 @@ body {
 
 .modal-body {
   padding: 24px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.modal-container {
+  background: #fff;
+  width: 100%;
+  max-width: 500px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 40px);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.modal-container .modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .form-field {
