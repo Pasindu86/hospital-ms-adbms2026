@@ -101,9 +101,15 @@ router.get('/doctor/:id/bookings', async (req, res) => {
               a.STATUS, 
               a.NOTES, 
               a.PAYMENT_METHOD, 
-              a.PAYMENT_STATUS
+              a.PAYMENT_STATUS,
+              bp.DOCTOR_FEE,
+              bp.HOSPITAL_FEE,
+              bp.TOTAL_AMOUNT
        FROM PATIENT_DOCTOR_APPOINTMENT a
        JOIN PATIENTS p ON a.PATIENT_ID = p.PATIENT_ID
+       LEFT JOIN BOOKING_PAYMENT bp ON a.PATIENT_ID = bp.PATIENT_ID 
+                                  AND a.DOCTOR_ID = bp.DOCTOR_ID 
+                                  AND a.APPOINTMENT_DATE = bp.APPOINTMENT_DATE
        WHERE a.DOCTOR_ID = :doctorId
          AND TRUNC(a.APPOINTMENT_DATE) = TRUNC(:queryDate)
        ORDER BY a.TOKEN_NUMBER ASC, a.APPOINTMENT_DATE ASC`,

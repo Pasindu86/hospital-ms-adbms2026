@@ -49,14 +49,14 @@ export default function Login() {
         </div>
 
         <h1 className="hms-title">CarePulse HMS</h1>
-        <p className="hms-subtitle">Staff Access Portal</p>
+        <p className="hms-subtitle">Secure Access Portal</p>
 
         <form onSubmit={handleSubmit} className="hms-form">
           {error && <div className="error-message">{error}</div>}
 
           {/* Staff ID / Email Field */}
           <div className="input-group">
-            <label htmlFor="staffId">Staff ID or Email</label>
+            <label htmlFor="staffId">Email or Staff ID</label>
             <div className="input-field-wrapper">
               <span className="field-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -67,7 +67,7 @@ export default function Login() {
               <input
                 id="staffId"
                 type="text"
-                placeholder="e.g. 0001 or admin@carepulse.local"
+                placeholder="e.g. admin@carepulse.local or D001"
                 value={staffId}
                 onChange={(e) => setStaffId(e.target.value)}
                 required

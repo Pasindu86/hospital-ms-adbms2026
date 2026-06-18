@@ -121,6 +121,9 @@ export default function AdminDashboard() {
   const [availableNurses, setAvailableNurses] = useState([]);
   const [dashboardStats, setDashboardStats] = useState(null);
   const [staffList, setStaffList] = useState([]);
+  const [patients, setPatients] = useState([]);
+  const [appointments, setAppointments] = useState([]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Sidebar navigation
   const [activeNav, setActiveNav] = useState('Staff');
@@ -177,6 +180,28 @@ export default function AdminDashboard() {
     fetchNurses();
     fetchDashboardData();
   }, []);
+
+  const fetchPatients = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/admin/patients`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setPatients(res.data.patients || []);
+    } catch (err) {
+      console.error('Failed to fetch patients', err);
+    }
+  };
+
+  const fetchAppointments = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/admin/appointments`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setAppointments(res.data.appointments || []);
+    } catch (err) {
+      console.error('Failed to fetch appointments', err);
+    }
+  };
 
   const handleNurseToggle = (nurseId) => {
     setFormData(prev => {
@@ -307,9 +332,11 @@ export default function AdminDashboard() {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       setMessage({ type: 'success', text: res.data.message || 'Staff registered successfully!' });
+      setFilterDept(formData.role);
+      setRefreshTrigger(prev => prev + 1);
       setFormData({
         fullName: '', email: '', password: '', role: 'doctor',
-        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: '', consultationFee: '', hospitalCharge: 500,
+        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: '', consultationFee: 0, hospitalCharge: 500,
         weeklyStartTime: '09:00', weeklyEndTime: '17:00'
       });
       setTimeout(() => setShowModal(false), 1500);
@@ -341,13 +368,14 @@ export default function AdminDashboard() {
             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
           });
           setStaffList(res.data.staffData || []);
+          if (res.data.stats) setDashboardStats(res.data.stats);
         } catch (err) {
           console.error('Failed to fetch dashboard data', err);
         }
       };
       fetchDashboardData();
     }
-  }, [filterDept]);
+  }, [filterDept, refreshTrigger]);
 
   const filteredStaff = staffList;
 
@@ -390,6 +418,12 @@ export default function AdminDashboard() {
               onClick={() => {
                 if (item.label === 'Schedules') {
                   openSchedules();
+                } else if (item.label === 'Patients') {
+                  setActiveNav('Patients');
+                  fetchPatients();
+                } else if (item.label === 'Appointments') {
+                  setActiveNav('Appointments');
+                  fetchAppointments();
                 } else {
                   setActiveNav(item.label);
                 }
@@ -521,6 +555,72 @@ export default function AdminDashboard() {
                 )}
               </div>
             </>
+          ) : activeNav === 'Patients' ? (
+            <>
+              <div className="page-title-row">
+                <div className="page-title">
+                  <h1>Patient Registry</h1>
+                  <p>Overview of all registered patients in the hospital.</p>
+                </div>
+              </div>
+              <div className="table-card">
+                <table className="staff-table">
+                  <thead>
+                    <tr>
+                      <th>Patient ID</th>
+                      <th>Name</th>
+                      <th>Disease</th>
+                      <th>Doctor Assigned</th>
+                      <th>Contact</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {patients.length > 0 ? patients.map(p => (
+                      <tr key={p.PATIENT_ID}>
+                        <td>#{p.PATIENT_ID}</td>
+                        <td style={{fontWeight: 600}}>{p.NAME}</td>
+                        <td>{p.DISEASE || 'N/A'}</td>
+                        <td>{p.DOCTOR_NAME ? `Dr. ${p.DOCTOR_NAME}` : 'Unassigned'}</td>
+                        <td>{p.PHONE_NUMBER || p.EMAIL || 'N/A'}</td>
+                      </tr>
+                    )) : <tr><td colSpan="5" style={{textAlign: 'center', padding: '20px'}}>No patients found.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : activeNav === 'Appointments' ? (
+            <>
+              <div className="page-title-row">
+                <div className="page-title">
+                  <h1>Hospital Appointments</h1>
+                  <p>View all scheduled appointments and their statuses.</p>
+                </div>
+              </div>
+              <div className="table-card">
+                <table className="staff-table">
+                  <thead>
+                    <tr>
+                      <th>Date & Time</th>
+                      <th>Patient</th>
+                      <th>Doctor</th>
+                      <th>Status</th>
+                      <th>Payment</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {appointments.length > 0 ? appointments.map((a, i) => (
+                      <tr key={i}>
+                        <td>{new Date(a.APPOINTMENT_DATE).toLocaleString()}</td>
+                        <td style={{fontWeight: 600}}>{a.PATIENT_NAME}</td>
+                        <td>Dr. {a.DOCTOR_NAME}</td>
+                        <td><span className={`status-badge ${a.STATUS === 'Scheduled' || a.STATUS === 'Completed' ? 'active' : 'deactivated'}`}>{a.STATUS}</span></td>
+                        <td><span className={`status-badge ${a.PAYMENT_STATUS === 'Paid' ? 'active' : 'deactivated'}`}>{a.PAYMENT_STATUS}</span></td>
+                      </tr>
+                    )) : <tr><td colSpan="5" style={{textAlign: 'center', padding: '20px'}}>No appointments found.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </>
           ) : (
           <>
           <div className="page-title-row">
@@ -623,63 +723,15 @@ export default function AdminDashboard() {
               </table>
 
               <div className="table-footer">
-                <span>Showing {filteredStaff.length} of 240 staff members</span>
-                <div className="pagination-btns">
-                  <button className="page-btn">‹</button>
-                  <button className="page-btn">›</button>
-                </div>
+                <span>Total {filteredStaff.length} staff members found</span>
               </div>
             </div>
 
-            {/* Right Panel */}
-            <div className="right-sidebar">
-              <div className="side-card">
-                <div className="side-card-header">Department Load</div>
-                <div className="side-card-body">
-                  {deptLoad.map(d => (
-                    <div className="dept-load-item" key={d.name}>
-                      <div className="dept-load-top">
-                        <span className="dept-load-name">{d.name}</span>
-                        <span className="dept-load-pct">{d.pct}%</span>
-                      </div>
-                      <div className="dept-load-bar">
-                        <div className={`dept-load-fill ${d.color}`} style={{ width: `${d.pct}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="side-card">
-                <div className="side-card-header">Recent Staff Actions</div>
-                <div className="side-card-body">
-                  {recentActions.map((a, i) => (
-                    <div className="action-item" key={i}>
-                      <div className={`action-dot ${a.color}`}>{a.icon}</div>
-                      <div className="action-text">
-                        <strong>{a.title}</strong>
-                        <span className="action-desc">{a.desc}</span>
-                        <span>{a.time}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button className="view-all-link">View All Logs</button>
-              </div>
-            </div>
           </div>
           </>
           )}
         </main>
 
-        <footer className="admin-footer">
-          <span>© 2024 CarePulse Health Systems. Confidential Admin Access Only.</span>
-          <div className="footer-links">
-            <a href="#privacy">Privacy Policy</a>
-            <a href="#terms">Terms of Service</a>
-            <a href="#health">System Health</a>
-          </div>
-        </footer>
       </div>
 
       {/* Modal */}

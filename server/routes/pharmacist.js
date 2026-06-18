@@ -46,7 +46,7 @@ router.get('/prescriptions/pending', async (req, res) => {
                 pi.DURATION,
                 pi.INSTRUCTIONS
              FROM PRESCRIPTION p
-             JOIN PATIENT pat ON p.PATIENT_ID = pat.PATIENT_ID
+             JOIN PATIENTS pat ON p.PATIENT_ID = pat.PATIENT_ID
              JOIN DOCTOR doc ON p.DOCTOR_ID = doc.DOCTOR_ID
              JOIN PRESCRIPTION_ITEM pi ON p.PRESCRIPTION_ID = pi.PRESCRIPTION_ID
              JOIN DRUG_STOCK ds ON pi.DRUG_ID = ds.DRUG_ID
