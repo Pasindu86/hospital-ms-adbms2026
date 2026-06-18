@@ -6,6 +6,9 @@ import './ReceptionDashboard.css';
 const API_URL = 'http://localhost:5000/api';
 
 export default function PharmacyRestock() {
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const pharmacistName = user?.name || "Pharmacist User";
   const navigate = useNavigate();
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +26,7 @@ export default function PharmacyRestock() {
     maxStock: '500',
     price: '10.00',
     manufactureDate: new Date().toISOString().split('T')[0],
-    expireDate: new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0],
+    expireDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     isShortcut: false
   });
 
@@ -82,7 +85,7 @@ export default function PharmacyRestock() {
       maxStock: '500',
       price: '10.00',
       manufactureDate: new Date().toISOString().split('T')[0],
-      expireDate: new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0],
+      expireDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       isShortcut: false
     });
     setIsRestockOpen(true);
@@ -97,7 +100,7 @@ export default function PharmacyRestock() {
       maxStock: item.CAPACITY || item.maxStock || '500',
       price: item.PRICE || item.price || '10.00',
       manufactureDate: new Date().toISOString().split('T')[0],
-      expireDate: new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0],
+      expireDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       isShortcut: true
     });
     setIsRestockOpen(true);
@@ -140,7 +143,8 @@ export default function PharmacyRestock() {
 
   const navItems = [
     { label: 'Inventory Overview', active: false, path: '/pharmacist/inventory', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg> },
-    { label: '+ New Dispense and Billing', active: false, path: '/pharmacist/dispense', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /></svg> },
+    { label: 'Stock Control', active: false, path: '/pharmacist/dispense', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /></svg> },
+    { label: 'Billing & Receipt', active: false, path: '/pharmacist/billing', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg> },
     { label: 'Restock', active: true, path: '/pharmacist/restock', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg> }
   ];
 
@@ -199,7 +203,7 @@ export default function PharmacyRestock() {
             <div className="user-profile">
               <div className="topbar-avatar">PM</div>
               <div className="user-info">
-                <span className="user-name">Pharmacist User</span>
+                <span className="user-name">{pharmacistName}</span>
                 <span className="user-role">Main Pharmacy</span>
               </div>
             </div>
@@ -213,7 +217,7 @@ export default function PharmacyRestock() {
               <p>Manage and log medicine restock requests for inventory supply.</p>
             </div>
             <div>
-              <button 
+              <button
                 onClick={handleOpenAddStockModal}
                 style={{ backgroundColor: '#1d4ed8', border: 'none', color: '#fff', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px' }}
               >
@@ -300,7 +304,7 @@ export default function PharmacyRestock() {
             }}
           >
             <div className="modal-header">
-              <h3>Add New Batch to Stock</h3>
+              <h3>Add New Stock</h3>
               <button className="modal-close" onClick={() => setIsRestockOpen(false)}>✕</button>
             </div>
             <div className="modal-body">

@@ -14,6 +14,7 @@ import UserDashboard from './pages/dashboards/UserDashboard'
 import UserHome from './pages/dashboards/UserHome'
 import BookAppointment from './pages/dashboards/BookAppointment'
 import PatientAppointments from './pages/dashboards/PatientAppointments'
+import PharmacyBilling from './pages/dashboards/PharmacyBilling'
 
 function ProtectedRoute({ children, role }) {
   const token = localStorage.getItem('token')
@@ -68,6 +69,7 @@ function App() {
           <Route index element={<InventoryDashboard />} />
           <Route path="inventory" element={<InventoryDashboard />} />
           <Route path="dispense" element={<PharmacyDispense />} />
+          <Route path="billing" element={<PharmacyBilling />} />
           <Route path="restock" element={<PharmacyRestock />} />
         </Route>
 

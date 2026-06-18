@@ -48,7 +48,8 @@ router.get('/nurses', verifyAdmin, async (req, res) => {
 router.post('/register-doctor', verifyAdmin, async (req, res) => {
     const {
         fullName, email, password, role,
-        mobileNumber, address, licenseNumber, specialistArea, nurses
+        mobileNumber, address, licenseNumber, specialistArea, nurses, consultationFee,
+        weeklyStartTime, weeklyEndTime
     } = req.body;
 
     if (role !== 'doctor') {
@@ -87,6 +88,13 @@ router.post('/register-doctor', verifyAdmin, async (req, res) => {
                     p_nurse_ids_csv => :nurseIdsCsv,
                     p_user_id => :outUserId
                 );
+                
+                UPDATE doctor SET consultation_fee = :consultationFee, hospital_charge = :hospitalCharge WHERE doctor_id = :outUserId;
+
+                -- Set the weekly come-in time across all 7 days when provided
+                IF :weeklyStartTime IS NOT NULL AND :weeklyEndTime IS NOT NULL THEN
+                    PKG_DOCTOR_AVAILABILITY.SET_WEEKLY(:outUserId, :weeklyStartTime, :weeklyEndTime, NULL);
+                END IF;
             END;`,
             {
                 staffId: generatedStaffId,
@@ -98,6 +106,10 @@ router.post('/register-doctor', verifyAdmin, async (req, res) => {
                 mobileNumber: mobileNumber || '',
                 specialistArea: specialistArea || '',
                 nurseIdsCsv: nurseIdsCsv,
+                consultationFee: req.body.consultationFee || 0,
+                hospitalCharge: req.body.hospitalCharge || 500,
+                weeklyStartTime: weeklyStartTime || null,
+                weeklyEndTime: weeklyEndTime || null,
                 outUserId: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
             },
             { autoCommit: true }
@@ -196,12 +208,128 @@ router.get('/doctors', verifyAdmin, async (req, res) => {
     try {
         connection = await oracledb.getConnection();
         const result = await connection.execute(
-            `SELECT doctor_id, name, specialist_area FROM doctor ORDER BY name ASC`
+            `SELECT doctor_id, name, specialist_area, consultation_fee, hospital_charge FROM doctor ORDER BY name ASC`
         );
         res.json({ doctors: result.rows });
     } catch (error) {
         console.error('GET /api/admin/doctors failed', error);
         res.status(500).json({ error: 'Failed to fetch doctors' });
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { /* ignore */ }
+        }
+    }
+});
+
+// NEW: Update doctor fee
+router.put('/doctors/:id/fee', verifyAdmin, async (req, res) => {
+    const { consultationFee, hospitalCharge } = req.body;
+    let connection;
+    try {
+        connection = await oracledb.getConnection();
+        await connection.execute(
+            `UPDATE doctor SET consultation_fee = :fee, hospital_charge = :hospitalCharge WHERE doctor_id = :id`,
+            { fee: consultationFee || 0, hospitalCharge: hospitalCharge || 500, id: req.params.id },
+            { autoCommit: true }
+        );
+        res.json({ message: 'Consultation fee updated successfully' });
+    } catch (error) {
+        console.error('PUT /api/admin/doctors/:id/fee failed', error);
+        res.status(500).json({ error: 'Failed to update consultation fee' });
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { /* ignore */ }
+        }
+    }
+});
+
+// ---------------------------------------------------------------------------
+// GET /doctors/:id/availability  — all 7 days for a doctor
+// ---------------------------------------------------------------------------
+const DAY_LABELS = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+router.get('/doctors/:id/availability', verifyAdmin, async (req, res) => {
+    let connection;
+    try {
+        connection = await oracledb.getConnection();
+        const result = await connection.execute(
+            `SELECT day_of_week, start_time, end_time
+             FROM doctor_availability
+             WHERE doctor_id = :id
+             ORDER BY day_of_week ASC`,
+            { id: req.params.id }
+        );
+
+        const byDay = {};
+        for (const row of result.rows) {
+            byDay[row.DAY_OF_WEEK] = { startTime: row.START_TIME, endTime: row.END_TIME };
+        }
+
+        const days = [];
+        for (let d = 1; d <= 7; d++) {
+            const set = byDay[d];
+            days.push({
+                day: d,
+                label: DAY_LABELS[d],
+                off: !set,
+                startTime: set ? set.startTime : '',
+                endTime: set ? set.endTime : ''
+            });
+        }
+
+        res.json({ availability: days });
+    } catch (error) {
+        console.error('GET /api/admin/doctors/:id/availability failed', error);
+        res.status(500).json({ error: 'Failed to fetch availability' });
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { /* ignore */ }
+        }
+    }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /doctors/:id/availability  — replace the weekly schedule
+// Body: { days: [{ day, off, startTime, endTime }, ...] }
+// ---------------------------------------------------------------------------
+router.put('/doctors/:id/availability', verifyAdmin, async (req, res) => {
+    const doctorId = req.params.id;
+    const days = Array.isArray(req.body.days) ? req.body.days : [];
+
+    if (days.length === 0) {
+        return res.status(400).json({ error: 'No schedule provided' });
+    }
+
+    let connection;
+    try {
+        connection = await oracledb.getConnection();
+
+        for (const d of days) {
+            const dayNum = Number(d.day);
+            if (!(dayNum >= 1 && dayNum <= 7)) continue;
+
+            if (d.off || !d.startTime || !d.endTime) {
+                await connection.execute(
+                    `BEGIN PKG_DOCTOR_AVAILABILITY.CLEAR_DAY(:id, :day); END;`,
+                    { id: doctorId, day: dayNum }
+                );
+            } else {
+                await connection.execute(
+                    `BEGIN PKG_DOCTOR_AVAILABILITY.SET_DAY(:id, :day, :startTime, :endTime); END;`,
+                    { id: doctorId, day: dayNum, startTime: d.startTime, endTime: d.endTime }
+                );
+            }
+        }
+
+        await connection.commit();
+        res.json({ message: 'Schedule updated successfully' });
+    } catch (error) {
+        console.error('PUT /api/admin/doctors/:id/availability failed', error);
+        if (connection) try { await connection.rollback(); } catch (e) { /* ignore */ }
+        const msg = (error.message || '').match(/ORA-200(2[0-2])/)
+            ? 'Invalid time range (end must be after start)'
+            : 'Failed to update schedule';
+        res.status(400).json({ error: msg });
     } finally {
         if (connection) {
             try { await connection.close(); } catch (e) { /* ignore */ }
@@ -355,22 +483,22 @@ router.get('/staff/:role', verifyAdmin, async (req, res) => {
                 IF :role = 'doctor' THEN
                     OPEN c_staff FOR 
                         SELECT u.user_id, u.staff_id, u.full_name, u.email, u.role, u.is_active,
-                               d.license_number, d.specialist_area AS specialized_info
+                               d.license_number, d.specialist_area AS specialized_info, d.consultation_fee, d.hospital_charge
                         FROM user_auth u JOIN doctor d ON u.user_id = d.doctor_id WHERE u.role = 'doctor';
                 ELSIF :role = 'nurse' THEN
                     OPEN c_staff FOR
                         SELECT u.user_id, u.staff_id, u.full_name, u.email, u.role, u.is_active,
-                               n.license_number, n.allocated_ward AS specialized_info
+                               n.license_number, n.allocated_ward AS specialized_info, NULL AS consultation_fee
                         FROM user_auth u JOIN nurse n ON u.user_id = n.nurse_id WHERE u.role = 'nurse';
                 ELSIF :role = 'pharmacist' THEN
                     OPEN c_staff FOR
                         SELECT u.user_id, u.staff_id, u.full_name, u.email, u.role, u.is_active,
-                               p.license_number, NULL AS specialized_info
+                               p.license_number, NULL AS specialized_info, NULL AS consultation_fee
                         FROM user_auth u JOIN pharmaceutical p ON u.user_id = p.pharmaceutical_id WHERE u.role = 'pharmacist';
                 ELSE
                     OPEN c_staff FOR
                         SELECT user_id, staff_id, full_name, email, role, is_active,
-                               NULL AS license_number, NULL AS specialized_info
+                               NULL AS license_number, NULL AS specialized_info, NULL AS consultation_fee, NULL as hospital_charge
                         FROM user_auth WHERE role = :role;
                 END IF;
                 :out_cursor := c_staff;
@@ -396,7 +524,9 @@ router.get('/staff/:role', verifyAdmin, async (req, res) => {
                 LICENSE_NUMBER: row.LICENSE_NUMBER,
                 // Map the specialized info dynamically to the common fields AdminDashboard uses
                 SPECIALIST_AREA: role === 'doctor' ? row.SPECIALIZED_INFO : undefined,
-                ALLOCATED_WARD: role === 'nurse' ? row.SPECIALIZED_INFO : undefined
+                ALLOCATED_WARD: role === 'nurse' ? row.SPECIALIZED_INFO : undefined,
+                CONSULTATION_FEE: row.CONSULTATION_FEE,
+                HOSPITAL_CHARGE: row.HOSPITAL_CHARGE
             });
         }
         await cursor.close();

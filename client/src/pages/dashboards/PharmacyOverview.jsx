@@ -5,10 +5,7 @@ import './ReceptionDashboard.css';
 
 const API_URL = 'http://localhost:5000/api';
 
-export default function PharmacyDispense() {
-  const userStr = localStorage.getItem('user');
-  const user = userStr ? JSON.parse(userStr) : null;
-  const pharmacistName = user?.name || "Pharmacist User";
+export default function PharmacyOverview() {
   const navigate = useNavigate();
   const [prescriptions, setPrescriptions] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -40,6 +37,29 @@ export default function PharmacyDispense() {
     isShortcut: false
   });
   const [isAddDrugOpen, setIsAddDrugOpen] = useState(false);
+  const [showBillingModal, setShowBillingModal] = useState(false);
+  const [billingForm, setBillingForm] = useState({ patientName: '', contactNumber: '' });
+  const [billingItems, setBillingItems] = useState([]);
+  const [currentBillItem, setCurrentBillItem] = useState({ drugId: '', quantity: 1 });
+
+  // Safe user parsing from localStorage
+  let user = { name: 'Pharmacist User', role: 'Main Pharmacy' };
+  try {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      user = JSON.parse(userStr);
+    }
+  } catch (e) {
+    console.error('Failed to parse user from localStorage', e);
+  }
+  const pharmacyUserName = user.name || 'Pharmacist User';
+  const pharmacyUserRole = user.role || 'Main Pharmacy';
+  const userInitials = pharmacyUserName
+    .split(' ')
+    .map(part => part.charAt(0))
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   useEffect(() => {
     fetchData();
@@ -214,7 +234,132 @@ export default function PharmacyDispense() {
     }
   };
 
+  const handleAddBillingItem = () => {
+    if (!currentBillItem.drugId || !currentBillItem.quantity) return;
+    const selectedDrug = inventory.find(d => String(d.DRUG_ID) === String(currentBillItem.drugId));
+    if (!selectedDrug) return;
 
+    const qty = Number(currentBillItem.quantity);
+    if (qty <= 0) return;
+
+    const drugPrice = selectedDrug.PRICE || 0;
+
+    const existingIndex = billingItems.findIndex(item => String(item.drugId) === String(currentBillItem.drugId));
+    if (existingIndex > -1) {
+      const updated = [...billingItems];
+      updated[existingIndex].quantity += qty;
+      updated[existingIndex].subtotal = updated[existingIndex].quantity * Number(drugPrice);
+      setBillingItems(updated);
+    } else {
+      setBillingItems([
+        ...billingItems,
+        {
+          drugId: selectedDrug.DRUG_ID,
+          drugName: selectedDrug.DRUG_NAME,
+          price: Number(drugPrice),
+          quantity: qty,
+          subtotal: qty * Number(drugPrice)
+        }
+      ]);
+    }
+    setCurrentBillItem({ drugId: '', quantity: 1 });
+  };
+
+  const handleRemoveBillingItem = (index) => {
+    const updated = [...billingItems];
+    updated.splice(index, 1);
+    setBillingItems(updated);
+  };
+
+  const handleConfirmAndPrint = async () => {
+    if (!billingForm.patientName || billingItems.length === 0) {
+      alert('Please provide patient name and at least one drug item.');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+      for (const item of billingItems) {
+        await axios.post(`${API_URL}/pharmacy/deduct-stock`, {
+          drugId: Number(item.drugId),
+          quantity: Number(item.quantity)
+        }, { headers });
+      }
+
+      const grandTotal = billingItems.reduce((acc, curr) => acc + curr.subtotal, 0);
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        const receiptHtml = `
+          <html>
+            <head>
+              <title>CarePulse Receipt</title>
+              <style>
+                body { font-family: sans-serif; padding: 20px; color: #333; }
+                .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+                .details { margin-bottom: 20px; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+                th { background-color: #f2f2f2; }
+                .total { font-weight: bold; font-size: 1.2em; text-align: right; margin-top: 20px; }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <h2>CarePulse Hospital</h2>
+                <p>Pharmacy & Dispensary Division</p>
+              </div>
+              <div class="details">
+                <p><strong>Patient Name:</strong> ${billingForm.patientName}</p>
+                <p><strong>Contact Number:</strong> ${billingForm.contactNumber || 'N/A'}</p>
+                <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Medicine</th>
+                    <th>Qty</th>
+                    <th>Unit Price (Rs.)</th>
+                    <th>Subtotal (Rs.)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${billingItems.map(item => `
+                    <tr>
+                      <td>${item.drugName}</td>
+                      <td>${item.quantity}</td>
+                      <td>LKR ${Number(item.price).toFixed(2)}</td>
+                      <td>LKR ${Number(item.subtotal).toFixed(2)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+              <div class="total">
+                Grand Total: LKR ${grandTotal.toFixed(2)}
+              </div>
+              <script>
+                window.onload = function() {
+                  window.print();
+                  window.close();
+                };
+              </script>
+            </body>
+          </html>
+        `;
+        printWindow.document.write(receiptHtml);
+        printWindow.document.close();
+      }
+
+      setBillingItems([]);
+      setBillingForm({ patientName: '', contactNumber: '' });
+      setShowBillingModal(false);
+      fetchInventory();
+    } catch (err) {
+      console.error('Error in Billing & Dispensing:', err);
+      alert(err.response?.data?.error || 'Failed to process billing and update stock.');
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -233,10 +378,7 @@ export default function PharmacyDispense() {
   const totalDrugsInInventory = inventory.length;
 
   const navItems = [
-    { label: 'Inventory Overview', active: false, path: '/pharmacist/inventory', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg> },
-    { label: 'Stock Control', active: true, path: '/pharmacist/dispense', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" ry="1" /></svg> },
-    { label: 'Billing & Receipt', active: false, path: '/pharmacist/billing', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg> },
-    { label: 'Restock', active: false, path: '/pharmacist/restock', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg> }
+    { label: 'Inventory', active: true, icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg> }
   ];
 
   return (
@@ -254,19 +396,31 @@ export default function PharmacyDispense() {
         </div>
         <nav className="sidebar-nav">
           {navItems.map(item => (
-            <button key={item.label} className={`sidebar-nav-item ${item.active ? 'active' : ''}`} onClick={() => navigate(item.path)}>
+            <button key={item.label} className={`sidebar-nav-item ${item.active ? 'active' : ''}`}>
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
             </button>
           ))}
+          <button
+            className="sidebar-nav-item"
+            onClick={handleOpenAddDrugModal}
+          >
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7h-9" /><path d="M14 17H5" /><circle cx="17" cy="17" r="3" /><circle cx="7" cy="7" r="3" /></svg>
+            </span>
+            <span className="nav-label">Stock Control</span>
+          </button>
+          <button
+            className="sidebar-nav-item"
+            onClick={() => setShowBillingModal(true)}
+          >
+            <span className="nav-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M8 11h8" /><path d="M8 15h6" /></svg>
+            </span>
+            <span className="nav-label">Bill &amp; Dispense</span>
+          </button>
         </nav>
         <div className="sidebar-bottom">
-          <button className="sidebar-bottom-item">
-            <span className="nav-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>
-            </span>
-            Help Center
-          </button>
           <button className="sidebar-bottom-item logout" onClick={handleLogout}>
             <span className="nav-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></svg>
@@ -293,10 +447,10 @@ export default function PharmacyDispense() {
           <div className="topbar-right">
             <div className="topbar-divider"></div>
             <div className="user-profile">
-              <div className="topbar-avatar">PM</div>
+              <div className="topbar-avatar">{userInitials}</div>
               <div className="user-info">
-                <span className="user-name">{pharmacistName}</span>
-                <span className="user-role">Main Pharmacy</span>
+                <span className="user-name">{pharmacyUserName}</span>
+                <span className="user-role">{pharmacyUserRole}</span>
               </div>
             </div>
           </div>
@@ -309,13 +463,19 @@ export default function PharmacyDispense() {
               <p>Manage pending prescription orders and hospital drug inventory levels.</p>
             </div>
             <div style={{ display: 'flex', gap: '12px' }}>
-
               <button
-                className="btn-primary-add"
-                onClick={handleOpenAddDrugModal}
-                style={{ backgroundColor: '#1d4ed8', border: 'none', color: '#fff', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
+                className="pharmacy-quick-btn success"
+                onClick={() => setShowBillingModal(true)}
               >
-                ＋ Add New Medicine
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M8 11h8" /><path d="M8 15h6" /></svg>
+                Create Bill
+              </button>
+              <button
+                className="pharmacy-quick-btn primary"
+                onClick={handleOpenAddDrugModal}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+                Add New Medicine
               </button>
             </div>
           </div>
@@ -361,7 +521,7 @@ export default function PharmacyDispense() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div className="table-card">
                 <div className="table-card-header">
-                  <h2>Stock Control</h2>
+                  <h2>Inventory Overview</h2>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                   <table className="staff-table">
@@ -601,6 +761,7 @@ export default function PharmacyDispense() {
       {/* Add New Medicine Modal with SCROLL FIX & FIELD LOCKING */}
       {isAddDrugOpen && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setIsAddDrugOpen(false)}>
+          {/* මෙතනට inline styles දැම්මා මචං උස සීමා වෙලා scroll වෙන්න */}
           <div
             className="modal-content"
             style={{
@@ -716,6 +877,128 @@ export default function PharmacyDispense() {
         </div>
       )}
 
+      {/* Billing Modal */}
+      {showBillingModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowBillingModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '650px' }}>
+            <div className="modal-header">
+              <h3>New Dispense &amp; Digital Billing Receipt</h3>
+              <button className="modal-close" onClick={() => setShowBillingModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="modal-form">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-field">
+                    <label>Patient Full Name</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. John Doe"
+                      value={billingForm.patientName}
+                      onChange={e => setBillingForm({ ...billingForm, patientName: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Contact Number</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 0771234567"
+                      value={billingForm.contactNumber}
+                      onChange={e => setBillingForm({ ...billingForm, contactNumber: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '10px', marginTop: '12px', border: '1px solid #e2e8f0' }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#1e293b' }}>Add Prescribed Drug Row</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px auto', gap: '12px', alignItems: 'end' }}>
+                    <div className="form-field" style={{ marginBottom: 0 }}>
+                      <label>Select Stock Med</label>
+                      <select
+                        value={currentBillItem.drugId}
+                        onChange={e => setCurrentBillItem({ ...currentBillItem, drugId: e.target.value })}
+                      >
+                        <option value="">-- Choose Item --</option>
+                        {inventory.map(d => (
+                          <option key={d.DRUG_ID} value={d.DRUG_ID}>
+                            {d.DRUG_NAME} [Batch: {d.BATCH_NUMBER || 'N/A'}] (Available: {d.QUANTITY})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-field" style={{ marginBottom: 0 }}>
+                      <label>Qty</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={currentBillItem.quantity}
+                        onChange={e => setCurrentBillItem({ ...currentBillItem, quantity: e.target.value })}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddBillingItem}
+                      style={{ padding: '10px 16px', background: '#334155', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', height: '40px' }}
+                    >
+                      ＋ Push
+                    </button>
+                  </div>
+                </div>
+
+                {/* Queue Summary Table */}
+                <div style={{ marginTop: '16px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                        <th style={{ padding: '8px', textAlign: 'left' }}>Med Name</th>
+                        <th style={{ padding: '8px', textAlign: 'center' }}>Qty</th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>Price</th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>Subtotal</th>
+                        <th style={{ padding: '8px', textAlign: 'center' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {billingItems.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" style={{ textAlign: 'center', padding: '16px', color: '#94a3b8' }}>No items pushed to statement yet.</td>
+                        </tr>
+                      ) : (
+                        billingItems.map((item, index) => (
+                          <tr key={index} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                            <td style={{ padding: '8px' }}>{item.drugName}</td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>{item.quantity}</td>
+                            <td style={{ padding: '8px', textAlign: 'right' }}>LKR {item.price.toFixed(2)}</td>
+                            <td style={{ padding: '8px', textAlign: 'right' }}>LKR {item.subtotal.toFixed(2)}</td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <button type="button" onClick={() => handleRemoveBillingItem(index)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}>✕</button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '12px', borderTop: '2px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a' }}>
+                    Grand Total: LKR {billingItems.reduce((sum, i) => sum + i.subtotal, 0).toFixed(2)}
+                  </div>
+                  <div className="modal-actions" style={{ padding: 0, border: 'none', margin: 0 }}>
+                    <button type="button" className="btn-cancel" onClick={() => setShowBillingModal(false)}>Cancel</button>
+                    <button
+                      type="button"
+                      className="btn-submit"
+                      onClick={handleConfirmAndPrint}
+                      style={{ backgroundColor: '#16a34a' }}
+                    >
+                      🖨️ Confirm &amp; Print Receipt
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

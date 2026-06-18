@@ -10,6 +10,7 @@ const doctorRoutes = require('./routes/doctor')
 const pharmacistRoutes = require('./routes/pharmacist')
 const patientRoutes = require('./routes/patients')
 const patientPortalRoutes = require('./routes/patient.routes')
+const receptionRoutes = require('./routes/reception')
 
 dotenv.config({ path: '.env.local' })
 
@@ -33,7 +34,9 @@ if (!DB_USER || !DB_PASSWORD || !DB_CONNECT_STRING) {
 }
 
 oracledb.outFormat = oracledb.OUT_FORMAT_OBJECT
-
+// Return CLOB columns (e.g. MEDICAL_RECORD.CLINICAL_ADVICE) as plain strings
+// instead of Lob stream objects, so they serialize correctly in res.json().
+oracledb.fetchAsString = [oracledb.CLOB]
 const app = express()
 app.use(cors())
 app.use(express.json())
@@ -49,6 +52,7 @@ app.use('/api/doctor', doctorRoutes)
 app.use('/api/pharmacist', pharmacistRoutes)
 app.use('/api/patients', patientRoutes)
 app.use('/api/patient', patientPortalRoutes)
+app.use('/api/reception', receptionRoutes)
 app.use("/api/pharmacy", require("./routes/pharmacyRoutes"));
 
 app.get('/api/users', async (req, res) => {

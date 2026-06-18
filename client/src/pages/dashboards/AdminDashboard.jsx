@@ -88,6 +88,11 @@ const navItems = [
   },
   {
     icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /><path d="M12 14v3" /><path d="M10.5 15.5 12 17l1.5-1.5" /></svg>
+    ), label: 'Schedules'
+  },
+  {
+    icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
     ), label: 'Inventory'
   },
@@ -107,6 +112,8 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [showAllocateModal, setShowAllocateModal] = useState(false);
+  const [showFeeModal, setShowFeeModal] = useState(false);
+  const [feeData, setFeeData] = useState({ doctorId: '', name: '', consultationFee: 0, hospitalCharge: 500 });
   const [allocateType, setAllocateType] = useState('doctor'); // 'doctor' or 'ward'
   const [filterDept, setFilterDept] = useState('all');
   const [loading, setLoading] = useState(false);
@@ -115,6 +122,18 @@ export default function AdminDashboard() {
   const [dashboardStats, setDashboardStats] = useState(null);
   const [staffList, setStaffList] = useState([]);
 
+  // Sidebar navigation
+  const [activeNav, setActiveNav] = useState('Staff');
+
+  // Schedules view
+  const DAY_LABELS = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const [scheduleDoctors, setScheduleDoctors] = useState([]);
+  const [scheduleDoctorId, setScheduleDoctorId] = useState('');
+  const [scheduleDays, setScheduleDays] = useState([]);
+  const [bulkTime, setBulkTime] = useState({ startTime: '09:00', endTime: '17:00' });
+  const [scheduleMsg, setScheduleMsg] = useState({ type: '', text: '' });
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+
   // Staff Selection Data
   const [adminNurses, setAdminNurses] = useState([]);
   const [adminDoctors, setAdminDoctors] = useState([]);
@@ -122,7 +141,8 @@ export default function AdminDashboard() {
   // Registration Form
   const [formData, setFormData] = useState({
     fullName: '', email: '', password: '', role: 'doctor',
-    mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: ''
+    mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: '', consultationFee: 0, hospitalCharge: 500,
+    weeklyStartTime: '09:00', weeklyEndTime: '17:00'
   });
 
   // Allocation Form
@@ -207,6 +227,64 @@ export default function AdminDashboard() {
     }
   };
 
+  const openSchedules = async () => {
+    setActiveNav('Schedules');
+    setScheduleMsg({ type: '', text: '' });
+    try {
+      const res = await axios.get(`${API_URL}/admin/doctors`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setScheduleDoctors(res.data.doctors || []);
+    } catch (err) {
+      console.error('Failed to load doctors for schedules', err);
+    }
+  };
+
+  const loadDoctorSchedule = async (doctorId) => {
+    setScheduleDoctorId(doctorId);
+    setScheduleMsg({ type: '', text: '' });
+    if (!doctorId) {
+      setScheduleDays([]);
+      return;
+    }
+    try {
+      const res = await axios.get(`${API_URL}/admin/doctors/${doctorId}/availability`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setScheduleDays(res.data.availability || []);
+    } catch (err) {
+      console.error('Failed to load schedule', err);
+      setScheduleMsg({ type: 'error', text: 'Failed to load schedule.' });
+    }
+  };
+
+  const updateScheduleDay = (day, patch) => {
+    setScheduleDays(prev => prev.map(d => d.day === day ? { ...d, ...patch } : d));
+  };
+
+  const applyBulkTime = () => {
+    setScheduleDays(prev => prev.map(d => ({
+      ...d, off: false, startTime: bulkTime.startTime, endTime: bulkTime.endTime
+    })));
+  };
+
+  const saveSchedule = async () => {
+    if (!scheduleDoctorId) return;
+    setScheduleSaving(true);
+    setScheduleMsg({ type: '', text: '' });
+    try {
+      const res = await axios.put(`${API_URL}/admin/doctors/${scheduleDoctorId}/availability`,
+        { days: scheduleDays },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+      );
+      setScheduleMsg({ type: 'success', text: res.data.message || 'Schedule saved!' });
+    } catch (err) {
+      setScheduleMsg({ type: 'error', text: err.response?.data?.error || 'Failed to save schedule.' });
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -231,7 +309,8 @@ export default function AdminDashboard() {
       setMessage({ type: 'success', text: res.data.message || 'Staff registered successfully!' });
       setFormData({
         fullName: '', email: '', password: '', role: 'doctor',
-        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: ''
+        mobileNumber: '', address: '', licenseNumber: '', specialistArea: '', nurses: [], allocatedWard: '', consultationFee: '', hospitalCharge: 500,
+        weeklyStartTime: '09:00', weeklyEndTime: '17:00'
       });
       setTimeout(() => setShowModal(false), 1500);
     } catch (err) {
@@ -305,7 +384,17 @@ export default function AdminDashboard() {
         </div>
         <nav className="sidebar-nav">
           {navItems.map(item => (
-            <button key={item.label} className={`sidebar-nav-item ${item.active ? 'active' : ''}`}>
+            <button
+              key={item.label}
+              className={`sidebar-nav-item ${activeNav === item.label ? 'active' : ''}`}
+              onClick={() => {
+                if (item.label === 'Schedules') {
+                  openSchedules();
+                } else {
+                  setActiveNav(item.label);
+                }
+              }}
+            >
               <span className="nav-icon">{item.icon}</span>
               <span className="nav-label">{item.label}</span>
             </button>
@@ -353,6 +442,87 @@ export default function AdminDashboard() {
         </header>
 
         <main className="page-content">
+          {activeNav === 'Schedules' ? (
+            <>
+              <div className="page-title-row">
+                <div className="page-title">
+                  <h1>Doctor Schedules</h1>
+                  <p>Set the weekly come-in time for each doctor. Bookings outside these hours are blocked.</p>
+                </div>
+              </div>
+
+              <div className="table-card" style={{ padding: '24px' }}>
+                {scheduleMsg.text && <div className={`alert alert-${scheduleMsg.type}`} style={{ marginBottom: '16px' }}>{scheduleMsg.text}</div>}
+
+                <div className="form-field" style={{ maxWidth: '420px', marginBottom: '24px' }}>
+                  <label>Select Doctor</label>
+                  <select value={scheduleDoctorId} onChange={e => loadDoctorSchedule(e.target.value)}>
+                    <option value="">-- Choose a doctor --</option>
+                    {scheduleDoctors.map(d => (
+                      <option key={d.DOCTOR_ID} value={d.DOCTOR_ID}>Dr. {d.NAME} {d.SPECIALIST_AREA ? `(${d.SPECIALIST_AREA})` : ''}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {scheduleDoctorId && (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', flexWrap: 'wrap', padding: '14px', background: '#f8fafc', borderRadius: '8px', marginBottom: '20px' }}>
+                      <div className="form-field" style={{ margin: 0 }}>
+                        <label>Apply to all days — Start</label>
+                        <input type="time" value={bulkTime.startTime} onChange={e => setBulkTime({ ...bulkTime, startTime: e.target.value })} />
+                      </div>
+                      <div className="form-field" style={{ margin: 0 }}>
+                        <label>End</label>
+                        <input type="time" value={bulkTime.endTime} onChange={e => setBulkTime({ ...bulkTime, endTime: e.target.value })} />
+                      </div>
+                      <button type="button" className="btn-secondary-action" onClick={applyBulkTime}>Apply to all 7 days</button>
+                    </div>
+
+                    <table className="staff-table">
+                      <thead>
+                        <tr>
+                          <th>Day</th>
+                          <th>Working?</th>
+                          <th>Start Time</th>
+                          <th>End Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {scheduleDays.map(d => (
+                          <tr key={d.day}>
+                            <td style={{ fontWeight: 600 }}>{DAY_LABELS[d.day]}</td>
+                            <td>
+                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={!d.off}
+                                  onChange={e => updateScheduleDay(d.day, { off: !e.target.checked })}
+                                />
+                                <span>{d.off ? 'Day off' : 'Working'}</span>
+                              </label>
+                            </td>
+                            <td>
+                              <input type="time" disabled={d.off} value={d.startTime || ''} onChange={e => updateScheduleDay(d.day, { startTime: e.target.value })} />
+                            </td>
+                            <td>
+                              <input type="time" disabled={d.off} value={d.endTime || ''} onChange={e => updateScheduleDay(d.day, { endTime: e.target.value })} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                      <button type="button" className="btn-primary-add" onClick={saveSchedule} disabled={scheduleSaving}>
+                        {scheduleSaving ? 'Saving...' : 'Save Schedule'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          ) : (
+          <>
           <div className="page-title-row">
             <div className="page-title">
               <h1>Staff Management</h1>
@@ -426,7 +596,7 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                       </td>
-                      <td>{s.SPECIALIST_AREA || s.ALLOCATED_WARD || '—'}</td>
+                      <td>{s.SPECIALIST_AREA || s.ALLOCATED_WARD || '—'} {s.ROLE === 'doctor' && s.CONSULTATION_FEE !== undefined && `(Rs ${s.CONSULTATION_FEE})`}</td>
                       <td>
                         <span className={`status-badge ${s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'active' : 'deactivated'}`}>
                           {s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'ACTIVE' : 'DEACTIVATED'}
@@ -434,7 +604,12 @@ export default function AdminDashboard() {
                       </td>
                       <td>
                         <div className="table-actions">
-                          <button className="action-link edit">Edit</button>
+                          <button className="action-link edit" onClick={() => {
+                            if (s.ROLE === 'doctor' || s.ROLE === undefined && s.SPECIALIST_AREA) {
+                              setFeeData({ doctorId: s.USER_ID || s.ID, name: s.FULL_NAME, consultationFee: s.CONSULTATION_FEE || 0, hospitalCharge: s.HOSPITAL_CHARGE || 500 });
+                              setShowFeeModal(true);
+                            }
+                          }}>{s.ROLE === 'doctor' || (s.ROLE === undefined && s.SPECIALIST_AREA) ? 'Set Fee' : 'Edit'}</button>
                           <button className={`action-link ${s.IS_ACTIVE === 1 ? 'deactivate' : 'activate'}`}>
                             {s.IS_ACTIVE === 1 ? 'Deactivate' : 'Activate'}
                           </button>
@@ -493,6 +668,8 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+          </>
+          )}
         </main>
 
         <footer className="admin-footer">
@@ -582,6 +759,32 @@ export default function AdminDashboard() {
                         </div>
                       )}
                     </div>
+
+                    {formData.role === 'doctor' && (
+                      <div className="modal-form-row">
+                        <div className="form-field" style={{ flex: 1 }}>
+                          <label>Consultation Fee (Rs.)</label>
+                          <input type="number" placeholder="e.g. 1500" value={formData.consultationFee} onChange={e => setFormData({ ...formData, consultationFee: e.target.value })} />
+                        </div>
+                        <div className="form-field" style={{ flex: 1 }}>
+                          <label>Hospital Charge (Rs.)</label>
+                          <input type="number" placeholder="e.g. 500" value={formData.hospitalCharge} onChange={e => setFormData({ ...formData, hospitalCharge: e.target.value })} />
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.role === 'doctor' && (
+                      <div className="modal-form-row">
+                        <div className="form-field" style={{ flex: 1 }}>
+                          <label>Weekly Come-in Time — Start</label>
+                          <input type="time" value={formData.weeklyStartTime} onChange={e => setFormData({ ...formData, weeklyStartTime: e.target.value })} />
+                        </div>
+                        <div className="form-field" style={{ flex: 1 }}>
+                          <label>End (applies to all 7 days)</label>
+                          <input type="time" value={formData.weeklyEndTime} onChange={e => setFormData({ ...formData, weeklyEndTime: e.target.value })} />
+                        </div>
+                      </div>
+                    )}
 
                     {formData.role === 'doctor' && (
                       <div className="form-field">
@@ -731,6 +934,60 @@ export default function AdminDashboard() {
                   <button type="button" className="btn-secondary" onClick={() => setShowAllocateModal(false)}>Cancel</button>
                   <button type="submit" className="btn-primary" disabled={loading}>
                     {loading ? 'Allocating...' : 'Confirm Allocation'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set Fee Modal */}
+      {showFeeModal && (
+        <div className="modal-overlay">
+          <div className="modal-container" style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <div>
+                <h2>Set Doctor Fee</h2>
+                <p>Update consultation fee for {feeData.name}.</p>
+              </div>
+              <button className="modal-close" onClick={() => setShowFeeModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                try {
+                  await axios.put(`${API_URL}/admin/doctors/${feeData.doctorId}/fee`, { consultationFee: feeData.consultationFee, hospitalCharge: feeData.hospitalCharge }, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                  });
+                  setShowFeeModal(false);
+
+                  // Simple state update instead of refresh
+                  setStaffList(prev => prev.map(s => {
+                    if (s.USER_ID === feeData.doctorId || s.ID === feeData.doctorId) {
+                      return { ...s, CONSULTATION_FEE: feeData.consultationFee, HOSPITAL_CHARGE: feeData.hospitalCharge };
+                    }
+                    return s;
+                  }));
+                } catch (err) {
+                  console.error('Failed to update fee', err);
+                } finally {
+                  setLoading(false);
+                }
+              }}>
+                <div className="form-group">
+                  <label>Consultation Fee (Rs.)</label>
+                  <input type="number" required value={feeData.consultationFee} onChange={e => setFeeData({ ...feeData, consultationFee: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label>Hospital Charge (Rs.)</label>
+                  <input type="number" required value={feeData.hospitalCharge} onChange={e => setFeeData({ ...feeData, hospitalCharge: e.target.value })} />
+                </div>
+                <div className="modal-footer" style={{ marginTop: '2rem' }}>
+                  <button type="button" className="btn-secondary" onClick={() => setShowFeeModal(false)}>Cancel</button>
+                  <button type="submit" className="btn-primary" disabled={loading}>
+                    {loading ? 'Saving...' : 'Save Fee'}
                   </button>
                 </div>
               </form>
