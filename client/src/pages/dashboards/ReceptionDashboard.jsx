@@ -343,11 +343,13 @@ export default function ReceptionDashboard() {
     <div className="reception-layout">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">✓</div>
-          <div className="sidebar-brand-text">
-            <h2>CarePulse</h2>
-            <span>Hospital MS</span>
+          <div className="sidebar-brand-header">
+            <div className="sidebar-brand-icon">✓</div>
+            <div className="sidebar-brand-text">
+              <h2>CarePulse</h2>
+            </div>
           </div>
+          <span className="sidebar-brand-sub">Hospital MS</span>
         </div>
         <nav className="sidebar-nav">
           <button className={`sidebar-nav-item ${tab === 'overview' ? 'active' : ''}`} onClick={() => setTab('overview')}>
