@@ -1,0 +1,531 @@
+/* =========================
+   BASE PAGE
+========================= */
+.booking-page-container {
+  background: #f5f9ff;
+  min-height: 100vh;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+  color: #1f2d3d;
+}
+
+.booking-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.booking-header h2 {
+  color: #1e5eff;
+  margin-bottom: 6px;
+}
+
+.booking-header p {
+  color: #5b6b7a;
+}
+
+/* =========================
+   ALERT
+========================= */
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.alert-success {
+  background: #e7f6ec;
+  color: #1a7f37;
+  border-left: 4px solid #1a7f37;
+}
+
+.alert-error {
+  background: #fde8e8;
+  color: #c53030;
+  border-left: 4px solid #c53030;
+}
+
+/* =========================
+   LAYOUT
+========================= */
+.booking-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+/* =========================
+   FORM CARD
+========================= */
+.booking-form-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 6px;
+}
+
+/* Inputs */
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cfe0ff;
+  border-radius: 8px;
+  outline: none;
+  font-size: 14px;
+  background: #fff;
+  transition: 0.2s;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #1e5eff;
+  box-shadow: 0 0 0 3px rgba(30, 94, 255, 0.1);
+}
+
+/* =========================
+   AVAILABILITY BOX
+========================= */
+.availability-banner {
+  background: #eef5ff;
+  border: 1px solid #d6e4ff;
+  padding: 12px;
+  border-radius: 10px;
+  margin-top: 10px;
+}
+
+.availability-banner-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  color: #1e5eff;
+}
+
+.availability-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.stat-item {
+  font-size: 12px;
+}
+
+.stat-value {
+  font-weight: bold;
+  color: #1f2d3d;
+}
+
+/* Badges */
+.badge-status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.badge-available {
+  background: #d6f5e3;
+  color: #1a7f37;
+}
+
+.badge-limited {
+  background: #fff4d6;
+  color: #b7791f;
+}
+
+.badge-booked {
+  background: #fde8e8;
+  color: #c53030;
+}
+
+/* =========================
+   SLOTS
+========================= */
+.slots-section {
+  margin-top: 10px;
+}
+
+.slot-category-group {
+  margin-bottom: 12px;
+}
+
+.slot-category-header {
+  font-weight: bold;
+  color: #1e5eff;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slots-pill-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.slot-pill-btn {
+  padding: 6px 12px;
+  border: 1px solid #cfe0ff;
+  background: white;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: 0.2s;
+}
+
+.slot-pill-btn:hover {
+  background: #eaf2ff;
+}
+
+.slot-pill-btn.selected {
+  background: #1e5eff;
+  color: white;
+  border-color: #1e5eff;
+}
+
+/* =========================
+   EMPTY STATE
+========================= */
+.empty-slots-state {
+  text-align: center;
+  padding: 20px;
+  color: #6b7c93;
+}
+
+/* =========================
+   RIGHT SUMMARY CARD
+========================= */
+.summary-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  height: fit-content;
+}
+
+.summary-card h3 {
+  color: #1e5eff;
+  margin-bottom: 16px;
+}
+
+.summary-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.summary-row-label {
+  font-size: 12px;
+  color: #6b7c93;
+}
+
+.summary-row-value {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.placeholder {
+  color: #a0aec0;
+}
+
+/* =========================
+   BUTTON
+========================= */
+.btn-primary {
+  width: 100%;
+  padding: 12px;
+  background: #1e5eff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-primary:hover {
+  background: #0f4ae6;
+}
+
+.btn-primary:disabled {
+  background: #a7c0ff;
+  cursor: not-allowed;
+}
+
+/* =========================
+   MODAL
+========================= */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.confirm-modal-card {
+  background: white;
+  width: 420px;
+  padding: 20px;
+  border-radius: 12px;
+}
+
+.confirm-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1e5eff;
+  margin-bottom: 10px;
+}
+
+.confirm-summary-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin: 6px 0;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.confirm-btn-cancel {
+  padding: 8px 12px;
+  border: 1px solid #cfe0ff;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.confirm-btn-proceed {
+  padding: 8px 12px;
+  background: #1e5eff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* =========================
+   WEEKLY AVAILABILITY HEADER
+========================= */
+.weekly-availability-container {
+  margin-bottom: 24px;
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.weekly-availability-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 12px;
+}
+
+.weekly-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.weekly-day-card {
+  border: 1px solid #eef3ff;
+  border-radius: 8px;
+  padding: 10px 4px;
+  text-align: center;
+  background: #fcfdfe;
+}
+
+.weekly-day-card.active {
+  border-color: #1e5eff;
+  background: #f0f5ff;
+}
+
+.weekly-day-name {
+  font-size: 11px;
+  font-weight: bold;
+  color: #8c9ba5;
+  text-transform: uppercase;
+}
+
+.weekly-day-card.active .weekly-day-name {
+  color: #1e5eff;
+}
+
+.weekly-day-hours {
+  font-size: 11px;
+  margin-top: 4px;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.weekly-day-card.active .weekly-day-hours {
+  color: #1a7f37;
+}
+
+/* =========================
+   2-WEEK CALENDAR GRID
+========================= */
+.calendar-section {
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
+.calendar-group-label {
+  font-size: 11px;
+  font-weight: bold;
+  color: #8c9ba5;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.calendar-date-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.calendar-date-btn:hover:not(:disabled) {
+  border-color: #1e5eff;
+  background: #f8faff;
+}
+
+.calendar-date-btn.selected {
+  background: #1a8a80;
+  color: white;
+  border-color: #1a8a80;
+}
+
+.calendar-date-btn:disabled {
+  background: #f7fafc;
+  border-color: #edf2f7;
+  color: #cbd5e0;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.calendar-date-day {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.calendar-date-val {
+  font-size: 13px;
+  font-weight: bold;
+  margin-top: 2px;
+}
+
+/* =========================
+   TOKEN STYLING & SUCCESS
+========================= */
+.token-banner-info {
+  background: #e6fffa;
+  border: 1px solid #b2f5ea;
+  color: #00695c;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-top: 16px;
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.token-success-card {
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  max-width: 480px;
+  margin: 40px auto;
+  border: 1px solid #e2e8f0;
+}
+
+.token-success-icon {
+  color: #1a7f37;
+  margin-bottom: 16px;
+}
+
+.token-number-box {
+  background: linear-gradient(135deg, #f0f7ff 0%, #e6f0ff 100%);
+  border: 2px solid #cbdfff;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 24px 0;
+}
+
+.token-number-label {
+  display: block;
+  font-size: 12px;
+  font-weight: bold;
+  color: #1e5eff;
+  letter-spacing: 1px;
+}
+
+.token-number-value {
+  display: block;
+  font-size: 48px;
+  font-weight: 900;
+  color: #0d44cc;
+  margin-top: 8px;
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: #e2e8f0;
+}
