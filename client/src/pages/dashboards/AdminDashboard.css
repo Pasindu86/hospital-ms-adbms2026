@@ -3,9 +3,9 @@
 
 :root {
   /* Core Medical Palette */
-  --primary: #0a58ca;
-  --primary-hover: #084298;
-  --primary-light: #e7f1ff;
+  --primary: #0066fe;
+  --primary-hover: #0052cc;
+  --primary-light: #ebf4ff;
 
   /* Neutral Palette */
   --bg-main: #f3f4f6;

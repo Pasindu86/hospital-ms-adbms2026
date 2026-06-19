@@ -29,7 +29,7 @@ async function getAvailableSlots(connection, doctorId, dateStr) {
   )
 
   if (availRes.rows.length === 0) {
-    return { slots: [], hours: null, message: 'Doctor is not available on this day', nextToken: null }
+    return { slots: [], hours: null, nextToken: 1, message: 'Doctor is not available on this day' }
   }
 
   const { START_TIME: startTime, END_TIME: endTime } = availRes.rows[0]
@@ -44,8 +44,6 @@ async function getAvailableSlots(connection, doctorId, dateStr) {
     { doctorId, dateStr }
   )
   const booked = new Set(bookedRes.rows.map((r) => r.SLOT_TIME))
-  const nextToken = booked.size + 1
-
   slots = slots.filter((s) => !booked.has(s))
 
   const now = new Date()
@@ -55,20 +53,36 @@ async function getAvailableSlots(connection, doctorId, dateStr) {
     slots = slots.filter((s) => parseTime(s) > nowMinutes)
   }
 
+  const tokenRes = await connection.execute(
+    `SELECT NVL(MAX(TOKEN_NUMBER), 0) AS max_token
+     FROM patient_doctor_appointment
+     WHERE doctor_id = :doctorId
+       AND TRUNC(appointment_date) = TO_DATE(:dateStr, 'YYYY-MM-DD')`,
+    { doctorId, dateStr }
+  )
+  const nextToken = (tokenRes.rows[0]?.MAX_TOKEN || 0) + 1
+
   return {
     slots,
     hours: { start: startTime, end: endTime },
+    nextToken,
     message: slots.length ? null : 'No slots left for this day',
-    nextToken: slots.length > 0 ? nextToken : null
   }
 }
 
 async function validateAppointmentSlot(connection, doctorId, appointmentDateIso) {
   const dateStr = appointmentDateIso.slice(0, 10)
-  const timeStr = appointmentDateIso.slice(11, 16)
-  const { slots, message } = await getAvailableSlots(connection, doctorId, dateStr)
-  if (!slots.includes(timeStr)) {
-    throw new Error(message || `Time slot ${timeStr} is not available for this doctor`)
+  const dateObj = new Date(`${dateStr}T12:00:00`)
+  const dayOfWeek = jsDayToIso(dateObj.getDay())
+
+  const availRes = await connection.execute(
+    `SELECT start_time, end_time FROM doctor_availability
+     WHERE doctor_id = :doctorId AND day_of_week = :dayOfWeek`,
+    { doctorId, dayOfWeek }
+  )
+
+  if (availRes.rows.length === 0) {
+    throw new Error('Doctor is not available on this day')
   }
 }
 
@@ -94,76 +108,21 @@ router.get('/public/doctors', async (req, res) => {
   let connection
   try {
     connection = await oracledb.getConnection()
-
     const result = await connection.execute(
       `SELECT d.doctor_id AS "doctorId",
               d.name AS "name",
               d.specialist_area AS "specialty",
               d.email AS "email",
-              d.mobile_number AS "phone",
-              NVL(d.consultation_fee, 0) AS "consultationFee",
-              NVL(d.hospital_charge, 0) AS "hospitalCharge"
+              d.mobile_number AS "phone"
        FROM doctor d
        JOIN user_auth u ON d.doctor_id = u.user_id
        WHERE u.is_active = 1
        ORDER BY d.name ASC`
     )
-
-    const availRes = await connection.execute(
-      `SELECT doctor_id, day_of_week, start_time, end_time FROM doctor_availability`
-    )
-
-    const availabilityMap = {}
-    for (const row of availRes.rows) {
-      if (!availabilityMap[row.DOCTOR_ID]) {
-        availabilityMap[row.DOCTOR_ID] = []
-      }
-      availabilityMap[row.DOCTOR_ID].push({
-        dayOfWeek: row.DAY_OF_WEEK,
-        startTime: row.START_TIME,
-        endTime: row.END_TIME
-      })
-    }
-
-    const doctors = result.rows.map(d => ({
-      ...d,
-      totalFee: d.consultationFee + d.hospitalCharge,
-      availability: availabilityMap[d.doctorId] || []
-    }))
-
-    res.json(doctors)
+    res.json(result.rows)
   } catch (error) {
     console.error('GET /api/patient/public/doctors failed', error)
     res.status(500).json({ error: 'Failed to fetch doctors' })
-  } finally {
-    if (connection) try { await connection.close() } catch { /* ignore */ }
-  }
-})
-
-router.get('/public/doctors/:doctorId/slots', async (req, res) => {
-  const doctorId = parseInt(req.params.doctorId, 10)
-  const { date } = req.query
-
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return res.status(400).json({ error: 'Valid date query param required (YYYY-MM-DD)' })
-  }
-
-  let connection
-  try {
-    connection = await oracledb.getConnection()
-    const result = await getAvailableSlots(connection, doctorId, date)
-    res.json({
-      date,
-      doctorId,
-      slotMinutes: 15,
-      hours: result.hours,
-      slots: result.slots,
-      message: result.message,
-      nextToken: result.nextToken
-    })
-  } catch (error) {
-    console.error('GET /api/patient/public/doctors/:id/slots failed', error)
-    res.status(500).json({ error: 'Failed to fetch time slots' })
   } finally {
     if (connection) try { await connection.close() } catch { /* ignore */ }
   }
@@ -384,11 +343,35 @@ router.get('/doctors/:doctorId/slots', authenticatePatient, async (req, res) => 
       slotMinutes: 15,
       hours: result.hours,
       slots: result.slots,
+      nextToken: result.nextToken,
       message: result.message,
     })
   } catch (error) {
     console.error('GET /api/patient/doctors/:id/slots failed', error)
     res.status(500).json({ error: 'Failed to fetch time slots' })
+  } finally {
+    if (connection) try { await connection.close() } catch { /* ignore */ }
+  }
+})
+
+// ─── GET WEEKLY AVAILABILITY FOR A DOCTOR ───
+router.get('/doctors/:doctorId/weekly-availability', authenticatePatient, async (req, res) => {
+  const doctorId = parseInt(req.params.doctorId, 10)
+  let connection
+  try {
+    connection = await oracledb.getConnection()
+    const result = await connection.execute(
+      `SELECT day_of_week AS "dayOfWeek",
+              start_time AS "startTime",
+              end_time AS "endTime"
+       FROM doctor_availability
+       WHERE doctor_id = :doctorId`,
+      { doctorId }
+    )
+    res.json(result.rows)
+  } catch (error) {
+    console.error('GET /api/patient/doctors/:id/weekly-availability failed', error)
+    res.status(500).json({ error: 'Failed to fetch doctor availability' })
   } finally {
     if (connection) try { await connection.close() } catch { /* ignore */ }
   }
@@ -404,6 +387,8 @@ router.get('/doctors', authenticatePatient, async (req, res) => {
               d.name AS "name",
               d.specialist_area AS "specialty",
               d.email AS "email",
+              d.consultation_fee AS "doctorFee",
+              d.hospital_charge AS "hospitalFee",
               (SELECT MIN(da.start_time) || '-' || MAX(da.end_time)
                FROM doctor_availability da WHERE da.doctor_id = d.doctor_id) AS "hoursSummary"
        FROM doctor d
@@ -442,7 +427,7 @@ router.post('/appointments', authenticatePatient, async (req, res) => {
       `INSERT INTO patient_doctor_appointment
          (patient_id, doctor_id, appointment_date, notes, status, payment_method, payment_status)
        VALUES (:patientId, :doctorId, :apptDate, :notes, 'Scheduled', :paymentMethod, 'Pending')
-       RETURNING appointment_id INTO :appointmentId`,
+       RETURNING appointment_id, token_number INTO :appointmentId, :tokenNumber`,
       {
         patientId: req.user.patientId,
         doctorId: parseInt(doctorId, 10),
@@ -450,6 +435,7 @@ router.post('/appointments', authenticatePatient, async (req, res) => {
         notes: notes || null,
         paymentMethod: paymentMethod || 'Cash',
         appointmentId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT },
+        tokenNumber: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT },
       }
     )
 
@@ -467,6 +453,7 @@ router.post('/appointments', authenticatePatient, async (req, res) => {
     res.status(201).json({
       message: 'Appointment booked successfully',
       appointmentId: outVal(result.outBinds.appointmentId),
+      tokenNumber: outVal(result.outBinds.tokenNumber),
     })
   } catch (error) {
     console.error('POST /api/patient/appointments failed', error)
