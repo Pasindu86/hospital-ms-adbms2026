@@ -113,16 +113,72 @@ router.get('/public/doctors', async (req, res) => {
               d.name AS "name",
               d.specialist_area AS "specialty",
               d.email AS "email",
-              d.mobile_number AS "phone"
+              d.mobile_number AS "phone",
+              NVL(d.consultation_fee, 0) + NVL(d.hospital_charge, 0) AS "totalFee"
        FROM doctor d
        JOIN user_auth u ON d.doctor_id = u.user_id
        WHERE u.is_active = 1
        ORDER BY d.name ASC`
     )
-    res.json(result.rows)
+
+    const doctorIds = result.rows.map(r => r.doctorId)
+    let availabilityMap = {}
+    if (doctorIds.length > 0) {
+      const availRes = await connection.execute(
+        `SELECT doctor_id AS "doctorId",
+                day_of_week AS "dayOfWeek",
+                start_time AS "startTime",
+                end_time AS "endTime"
+         FROM doctor_availability
+         WHERE doctor_id IN (${doctorIds.map((_, i) => `:id${i}`).join(',')})
+         ORDER BY doctor_id, day_of_week`,
+        doctorIds.reduce((acc, id, i) => { acc[`id${i}`] = id; return acc }, {})
+      )
+      for (const row of availRes.rows) {
+        if (!availabilityMap[row.doctorId]) availabilityMap[row.doctorId] = []
+        availabilityMap[row.doctorId].push({
+          dayOfWeek: row.dayOfWeek,
+          startTime: row.startTime,
+          endTime: row.endTime,
+        })
+      }
+    }
+
+    const doctors = result.rows.map(doc => ({
+      ...doc,
+      availability: availabilityMap[doc.doctorId] || [],
+    }))
+
+    res.json(doctors)
   } catch (error) {
     console.error('GET /api/patient/public/doctors failed', error)
     res.status(500).json({ error: 'Failed to fetch doctors' })
+  } finally {
+    if (connection) try { await connection.close() } catch { /* ignore */ }
+  }
+})
+
+router.get('/public/doctors/:doctorId/slots', async (req, res) => {
+  const doctorId = parseInt(req.params.doctorId, 10)
+  const { date } = req.query
+
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'Valid date query param required (YYYY-MM-DD)' })
+  }
+
+  let connection
+  try {
+    connection = await oracledb.getConnection()
+    const result = await getAvailableSlots(connection, doctorId, date)
+    res.json({
+      date,
+      doctorId,
+      nextToken: result.nextToken,
+      message: result.message,
+    })
+  } catch (error) {
+    console.error('GET /api/patient/public/doctors/:id/slots failed', error)
+    res.status(500).json({ error: 'Failed to fetch token info' })
   } finally {
     if (connection) try { await connection.close() } catch { /* ignore */ }
   }
