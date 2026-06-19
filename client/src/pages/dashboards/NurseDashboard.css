@@ -1,12 +1,12 @@
 /* NurseDashboard.css - Clean Duty-Focused Layout */
 
 :root {
-    --nurse-primary: #0ea5e9;
-    --nurse-primary-light: rgba(14, 165, 233, 0.08);
-    --nurse-secondary: #6366f1;
-    --nurse-secondary-light: rgba(99, 102, 241, 0.08);
+    --nurse-primary: #0066fe;
+    --nurse-primary-light: rgba(0, 102, 254, 0.08);
+    --nurse-secondary: #0052cc;
+    --nurse-secondary-light: rgba(0, 82, 204, 0.08);
     --nurse-accent: #f59e0b;
-    --nurse-bg: #f8fafc;
+    --nurse-bg: #f3f4f6;
     --nurse-card: #ffffff;
     --nurse-text-main: #1e293b;
     --nurse-text-muted: #64748b;
@@ -29,9 +29,11 @@
     border-right: 1px solid var(--nurse-border);
     display: flex;
     flex-direction: column;
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
     height: 100vh;
+    z-index: 100;
 }
 
 .nurse-sidebar-brand {
@@ -110,6 +112,7 @@
 /* Main Area */
 .nurse-main-area {
     flex: 1;
+    margin-left: 260px;
     display: flex;
     flex-direction: column;
     padding: 2rem 2.5rem;
