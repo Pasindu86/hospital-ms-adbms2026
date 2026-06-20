@@ -431,7 +431,7 @@ router.get('/dashboard-stats', verifyAdmin, async (req, res) => {
         const counts = await connection.execute(`
             SELECT 
                 (SELECT COUNT(*) FROM user_auth WHERE role = 'doctor' AND is_active = 1) as total_doctors,
-                (SELECT COUNT(*) FROM patient) as total_patients,
+                (SELECT COUNT(*) FROM patients) as total_patients,
                 (SELECT COUNT(*) FROM doctor_patient) as active_appointments,
                 (SELECT COUNT(*) FROM user_auth WHERE role = 'nurse' AND is_active = 1) as total_nurses
             FROM DUAL
@@ -492,9 +492,9 @@ router.get('/staff/:role', verifyAdmin, async (req, res) => {
                         FROM user_auth u JOIN nurse n ON u.user_id = n.nurse_id WHERE u.role = 'nurse';
                 ELSIF :role = 'pharmacist' THEN
                     OPEN c_staff FOR
-                        SELECT u.user_id, u.staff_id, u.full_name, u.email, u.role, u.is_active,
-                               p.license_number, NULL AS specialized_info, NULL AS consultation_fee
-                        FROM user_auth u JOIN pharmaceutical p ON u.user_id = p.pharmaceutical_id WHERE u.role = 'pharmacist';
+                        SELECT user_id, staff_id, full_name, email, role, is_active,
+                               NULL AS license_number, NULL AS specialized_info, NULL AS consultation_fee, NULL as hospital_charge
+                        FROM user_auth WHERE role = 'pharmacist';
                 ELSE
                     OPEN c_staff FOR
                         SELECT user_id, staff_id, full_name, email, role, is_active,
@@ -535,6 +535,62 @@ router.get('/staff/:role', verifyAdmin, async (req, res) => {
     } catch (error) {
         console.error('GET /api/admin/staff/:role failed', error);
         res.status(500).json({ error: 'Failed to fetch staff by role' });
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { /* ignore */ }
+        }
+    }
+});
+
+// ---------------------------------------------------------------------------
+// GET /patients
+// ---------------------------------------------------------------------------
+router.get('/patients', verifyAdmin, async (req, res) => {
+    let connection;
+    try {
+        connection = await oracledb.getConnection();
+        const result = await connection.execute(
+            `SELECT p.patient_id, p.name, p.email, p.phone_number, p.disease, p.gender, 
+                    d.full_name AS doctor_name
+             FROM patients p
+             LEFT JOIN doctor_patient dp ON p.patient_id = dp.patient_id
+             LEFT JOIN user_auth d ON dp.doctor_id = d.user_id
+             ORDER BY p.patient_id DESC`,
+             [],
+             { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+        res.json({ patients: result.rows });
+    } catch (error) {
+        console.error('GET /api/admin/patients failed', error);
+        res.status(500).json({ error: 'Failed to fetch patients' });
+    } finally {
+        if (connection) {
+            try { await connection.close(); } catch (e) { /* ignore */ }
+        }
+    }
+});
+
+// ---------------------------------------------------------------------------
+// GET /appointments
+// ---------------------------------------------------------------------------
+router.get('/appointments', verifyAdmin, async (req, res) => {
+    let connection;
+    try {
+        connection = await oracledb.getConnection();
+        const result = await connection.execute(
+            `SELECT a.appointment_date, a.status, a.payment_status, 
+                    p.name AS patient_name, d.name AS doctor_name
+             FROM patient_doctor_appointment a
+             JOIN patients p ON a.patient_id = p.patient_id
+             JOIN doctor d ON a.doctor_id = d.doctor_id
+             ORDER BY a.appointment_date DESC`,
+             [],
+             { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+        res.json({ appointments: result.rows });
+    } catch (error) {
+        console.error('GET /api/admin/appointments failed', error);
+        res.status(500).json({ error: 'Failed to fetch appointments' });
     } finally {
         if (connection) {
             try { await connection.close(); } catch (e) { /* ignore */ }

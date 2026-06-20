@@ -65,7 +65,7 @@ export default function PharmacistDashboard() {
       <aside className="pharmacist-sidebar">
         <div className="pharmacist-sidebar-brand">
           <div className="pharmacist-brand-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.5 20.5 7 17l5-5-3.5-3.5L12 5l5 5-3.5 3.5 3.5 3.5-3.5 3.5Z" /><path d="M21 21v-4a2 2 0 0 0-2-2h-4" /><path d="M3 3v4a2 2 0 0 0 2 2h4" /></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.503 4.045 3 5.5L12 21l7-7Z" /></svg>
           </div>
           <div className="sidebar-brand-text">
             <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>CarePulse</h2>
