@@ -26,7 +26,6 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-.sidebar,
 .patient-sidebar {
   width: 240px;
   min-width: 240px;
@@ -50,14 +49,12 @@
   min-height: 100vh;
 }
 
-.sidebar h2,
 .patient-sidebar h2 {
   color: var(--primary);
   font-size: 20px;
   margin: 0 0 24px 8px;
 }
 
-.sidebar a,
 .patient-sidebar a {
   display: block;
   padding: 10px 14px;
@@ -69,15 +66,12 @@
   transition: all 0.15s;
 }
 
-.sidebar a:hover,
-.sidebar a.active,
 .patient-sidebar a:hover,
 .patient-sidebar a.active {
   background: var(--primary-light);
   color: var(--primary);
 }
 
-.topbar,
 .patient-topbar {
   display: flex;
   justify-content: space-between;
@@ -88,10 +82,8 @@
   flex-shrink: 0;
 }
 
-.topbar h3,
 .patient-topbar h3 { margin: 0; font-size: 18px; color: var(--text); }
 
-.main,
 .patient-main {
   padding: 32px;
   flex: 1;
