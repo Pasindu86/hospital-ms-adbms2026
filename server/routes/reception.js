@@ -2,14 +2,13 @@ const express = require('express')
 const router = express.Router()
 const oracledb = require('oracledb')
 
-// GET /api/reception/doctors
+// GET /api/doctors
 router.get('/doctors', async (req, res) => {
   let connection
   try {
     connection = await oracledb.getConnection()
-    
-    // Assume HOSPITAL_FEE is standard, e.g., 500, we'll just return DOCTOR data
-    // The DOCTOR table has DOCTOR_ID, NAME, SPECIALIST_AREA, CONSULTATION_FEE
+
+    CONSULTATION_FEE
     const result = await connection.execute(
       `SELECT DOCTOR_ID, NAME, SPECIALIST_AREA, NVL(CONSULTATION_FEE, 0) AS CONSULTATION_FEE 
        FROM DOCTOR 
@@ -31,11 +30,11 @@ router.get('/doctors', async (req, res) => {
   }
 })
 
-// GET /api/reception/doctor/:id/token
+// GET /api//token
 router.get('/doctor/:id/token', async (req, res) => {
   const { id } = req.params
-  const { date } = req.query // expecting YYYY-MM-DD
-  
+  const { date } = req.query
+
   if (!id) {
     return res.status(400).json({ error: 'Doctor ID is required' })
   }
@@ -43,10 +42,10 @@ router.get('/doctor/:id/token', async (req, res) => {
   let connection
   try {
     connection = await oracledb.getConnection()
-    
+
     let queryDate = new Date()
     if (date) {
-        queryDate = new Date(date)
+      queryDate = new Date(date)
     }
 
     const result = await connection.execute(
@@ -75,11 +74,11 @@ router.get('/doctor/:id/token', async (req, res) => {
   }
 })
 
-// GET /api/reception/doctor/:id/bookings
+// GET /api/bookings
 router.get('/doctor/:id/bookings', async (req, res) => {
   const { id } = req.params
   const { date } = req.query
-  
+
   if (!id) {
     return res.status(400).json({ error: 'Doctor ID is required' })
   }
@@ -87,10 +86,10 @@ router.get('/doctor/:id/bookings', async (req, res) => {
   let connection
   try {
     connection = await oracledb.getConnection()
-    
+
     let queryDate = new Date()
     if (date) {
-        queryDate = new Date(date)
+      queryDate = new Date(date)
     }
 
     const result = await connection.execute(
