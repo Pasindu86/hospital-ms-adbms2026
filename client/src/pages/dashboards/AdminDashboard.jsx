@@ -68,8 +68,8 @@ const stats = [
 const navItems = [
   {
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1" /><rect width="7" height="5" x="14" y="3" rx="1" /><rect width="7" height="9" x="14" y="12" rx="1" /><rect width="7" height="5" x="3" y="16" rx="1" /></svg>
-    ), label: 'Dashboards'
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
+    ), label: 'Staff', active: true
   },
   {
     icon: (
@@ -81,31 +81,15 @@ const navItems = [
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
     ), label: 'Appointments'
   },
-  {
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
-    ), label: 'Staff', active: true
-  },
+
   {
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /><path d="M12 14v3" /><path d="M10.5 15.5 12 17l1.5-1.5" /></svg>
     ), label: 'Schedules'
   },
-  {
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
-    ), label: 'Inventory'
-  },
-  {
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="20" y2="10" /><line x1="18" x2="18" y1="20" y2="4" /><line x1="6" x2="6" y1="20" y2="16" /></svg>
-    ), label: 'Reports'
-  },
-  {
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.72V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.17a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg>
-    ), label: 'Settings'
-  },
+
+
+
 ];
 
 export default function AdminDashboard() {
@@ -381,20 +365,17 @@ export default function AdminDashboard() {
 
   const dynamicStats = dashboardStats ? [
     {
-      label: 'Total Doctors', value: dashboardStats.TOTAL_DOCTORS || 0, icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.503 4.045 3 5.5L12 21l7-7Z" /><path d="M12 5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2" /><path d="M9 3v2" /><path d="M15 3v2" /><path d="M12 14v4" /><path d="M10 16h4" /></svg>
-      ), color: 'blue', badge: '+4%', badgeColor: 'green'
+      ...stats[0],
+      value: dashboardStats.TOTAL_DOCTORS || 0
     },
     {
-      label: 'Total Patients', value: dashboardStats.TOTAL_PATIENTS || 0, icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-      ), color: 'purple', badge: '+12%', badgeColor: 'green'
+      ...stats[1],
+      value: dashboardStats.TOTAL_PATIENTS || 0
     },
     {
-      label: 'Active Appointments', value: dashboardStats.ACTIVE_APPOINTMENTS || 0, icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><line x1="16" x2="16" y1="2" y2="6" /><line x1="8" x2="8" y1="2" y2="6" /><line x1="3" x2="21" y1="10" y2="10" /></svg>
-      ), color: 'amber', badge: 'Busy', badgeColor: 'orange'
-    },
+      ...stats[2],
+      value: dashboardStats.ACTIVE_APPOINTMENTS || 0
+    }
   ] : stats.slice(0, 3);
 
   return (
@@ -578,12 +559,12 @@ export default function AdminDashboard() {
                     {patients.length > 0 ? patients.map(p => (
                       <tr key={p.PATIENT_ID}>
                         <td>#{p.PATIENT_ID}</td>
-                        <td style={{fontWeight: 600}}>{p.NAME}</td>
+                        <td style={{ fontWeight: 600 }}>{p.NAME}</td>
                         <td>{p.DISEASE || 'N/A'}</td>
                         <td>{p.DOCTOR_NAME ? `Dr. ${p.DOCTOR_NAME}` : 'Unassigned'}</td>
                         <td>{p.PHONE_NUMBER || p.EMAIL || 'N/A'}</td>
                       </tr>
-                    )) : <tr><td colSpan="5" style={{textAlign: 'center', padding: '20px'}}>No patients found.</td></tr>}
+                    )) : <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>No patients found.</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -611,124 +592,124 @@ export default function AdminDashboard() {
                     {appointments.length > 0 ? appointments.map((a, i) => (
                       <tr key={i}>
                         <td>{new Date(a.APPOINTMENT_DATE).toLocaleString()}</td>
-                        <td style={{fontWeight: 600}}>{a.PATIENT_NAME}</td>
+                        <td style={{ fontWeight: 600 }}>{a.PATIENT_NAME}</td>
                         <td>Dr. {a.DOCTOR_NAME}</td>
                         <td><span className={`status-badge ${a.STATUS === 'Scheduled' || a.STATUS === 'Completed' ? 'active' : 'deactivated'}`}>{a.STATUS}</span></td>
                         <td><span className={`status-badge ${a.PAYMENT_STATUS === 'Paid' ? 'active' : 'deactivated'}`}>{a.PAYMENT_STATUS}</span></td>
                       </tr>
-                    )) : <tr><td colSpan="5" style={{textAlign: 'center', padding: '20px'}}>No appointments found.</td></tr>}
+                    )) : <tr><td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>No appointments found.</td></tr>}
                   </tbody>
                 </table>
               </div>
             </>
           ) : (
-          <>
-          <div className="page-title-row">
-            <div className="page-title">
-              <h1>Staff Management</h1>
-              <p>Oversee hospital personnel and administration roles.</p>
-            </div>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <button className="btn-secondary-action" onClick={openAllocateModal}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" x2="19" y1="8" y2="14" /><line x1="16" x2="22" y1="11" y2="11" /></svg>
-                Allocate Duty
-              </button>
-              <button className="btn-primary-add" onClick={() => { setShowModal(true); setMessage({ type: '', text: '' }); }}>
-                ＋ Add New Staff Member
-              </button>
-            </div>
-          </div>
-
-          {/* Stats Grid */}
-          <div className="stat-cards">
-            {dynamicStats.map((card, idx) => (
-              <div className="stat-card" key={idx}>
-                <div className={`stat-icon ${card.color}`}>{card.icon}</div>
-                <div className="stat-info">
-                  <div className="stat-label">{card.label}</div>
-                  <div className="stat-value">{card.value}</div>
+            <>
+              <div className="page-title-row">
+                <div className="page-title">
+                  <h1>Staff Management</h1>
+                  <p>Oversee hospital personnel and administration roles.</p>
                 </div>
-                <span className={`stat-badge ${card.badgeColor}`}>{card.badge}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="content-grid">
-            {/* Table Panel */}
-            <div className="table-card">
-              <div className="table-card-header">
-                <h2>Staff Overview</h2>
-                <div className="table-card-controls">
-                  <select className="filter-select" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
-                    <option value="all">All Roles</option>
-                    <option value="doctor">Doctors</option>
-                    <option value="nurse">Nurses</option>
-                    <option value="pharmacist">Pharmacists</option>
-                    <option value="reception">Receptionists</option>
-                    <option value="admin">Admins</option>
-                  </select>
-                  <button className="filter-btn">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9v6l4 3v-9L22 3z" /></svg>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                  <button className="btn-secondary-action" onClick={openAllocateModal}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" x2="19" y1="8" y2="14" /><line x1="16" x2="22" y1="11" y2="11" /></svg>
+                    Allocate Duty
+                  </button>
+                  <button className="btn-primary-add" onClick={() => { setShowModal(true); setMessage({ type: '', text: '' }); }}>
+                    ＋ Add New Staff Member
                   </button>
                 </div>
               </div>
 
-              <table className="staff-table">
-                <thead>
-                  <tr>
-                    <th>Name &amp; Role</th>
-                    <th>Department</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredStaff.length > 0 ? filteredStaff.map(s => (
-                    <tr key={s.USER_ID || s.ID}>
-                      <td>
-                        <div className="staff-user">
-                          <div className="staff-avatar av-blue">
-                            {s.FULL_NAME ? s.FULL_NAME.substring(0, 2).toUpperCase() : '??'}
-                          </div>
-                          <div>
-                            <div className="staff-name">{s.FULL_NAME}</div>
-                            <div className="staff-role" style={{ textTransform: 'capitalize' }}>{s.ROLE || filterDept}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>{s.SPECIALIST_AREA || s.ALLOCATED_WARD || '—'} {s.ROLE === 'doctor' && s.CONSULTATION_FEE !== undefined && `(Rs ${s.CONSULTATION_FEE})`}</td>
-                      <td>
-                        <span className={`status-badge ${s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'active' : 'deactivated'}`}>
-                          {s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'ACTIVE' : 'DEACTIVATED'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="table-actions">
-                          <button className="action-link edit" onClick={() => {
-                            if (s.ROLE === 'doctor' || s.ROLE === undefined && s.SPECIALIST_AREA) {
-                              setFeeData({ doctorId: s.USER_ID || s.ID, name: s.FULL_NAME, consultationFee: s.CONSULTATION_FEE || 0, hospitalCharge: s.HOSPITAL_CHARGE || 500 });
-                              setShowFeeModal(true);
-                            }
-                          }}>{s.ROLE === 'doctor' || (s.ROLE === undefined && s.SPECIALIST_AREA) ? 'Set Fee' : 'Edit'}</button>
-                          <button className={`action-link ${s.IS_ACTIVE === 1 ? 'deactivate' : 'activate'}`}>
-                            {s.IS_ACTIVE === 1 ? 'Deactivate' : 'Activate'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )) : (
-                    <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No staff records found.</td></tr>
-                  )}
-                </tbody>
-              </table>
-
-              <div className="table-footer">
-                <span>Total {filteredStaff.length} staff members found</span>
+              {/* Stats Grid */}
+              <div className="stat-cards">
+                {dynamicStats.map((card, idx) => (
+                  <div className="stat-card" key={idx}>
+                    <div className={`stat-icon ${card.color}`}>{card.icon}</div>
+                    <div className="stat-info">
+                      <div className="stat-label">{card.label}</div>
+                      <div className="stat-value">{card.value}</div>
+                    </div>
+                    <span className={`stat-badge ${card.badgeColor}`}>{card.badge}</span>
+                  </div>
+                ))}
               </div>
-            </div>
 
-          </div>
-          </>
+              <div className="content-grid">
+                {/* Table Panel */}
+                <div className="table-card">
+                  <div className="table-card-header">
+                    <h2>Staff Overview</h2>
+                    <div className="table-card-controls">
+                      <select className="filter-select" value={filterDept} onChange={e => setFilterDept(e.target.value)}>
+                        <option value="all">All Roles</option>
+                        <option value="doctor">Doctors</option>
+                        <option value="nurse">Nurses</option>
+                        <option value="pharmacist">Pharmacists</option>
+                        <option value="reception">Receptionists</option>
+                        <option value="admin">Admins</option>
+                      </select>
+                      <button className="filter-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9v6l4 3v-9L22 3z" /></svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  <table className="staff-table">
+                    <thead>
+                      <tr>
+                        <th>Name &amp; Role</th>
+                        <th>Department</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStaff.length > 0 ? filteredStaff.map(s => (
+                        <tr key={s.USER_ID || s.ID}>
+                          <td>
+                            <div className="staff-user">
+                              <div className="staff-avatar av-blue">
+                                {s.FULL_NAME ? s.FULL_NAME.substring(0, 2).toUpperCase() : '??'}
+                              </div>
+                              <div>
+                                <div className="staff-name">{s.FULL_NAME}</div>
+                                <div className="staff-role" style={{ textTransform: 'capitalize' }}>{s.ROLE || filterDept}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{s.SPECIALIST_AREA || s.ALLOCATED_WARD || '—'} {s.ROLE === 'doctor' && s.CONSULTATION_FEE !== undefined && `(Rs ${s.CONSULTATION_FEE})`}</td>
+                          <td>
+                            <span className={`status-badge ${s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'active' : 'deactivated'}`}>
+                              {s.IS_ACTIVE === 1 || s.IS_ACTIVE === undefined ? 'ACTIVE' : 'DEACTIVATED'}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="table-actions">
+                              <button className="action-link edit" onClick={() => {
+                                if (s.ROLE === 'doctor' || s.ROLE === undefined && s.SPECIALIST_AREA) {
+                                  setFeeData({ doctorId: s.USER_ID || s.ID, name: s.FULL_NAME, consultationFee: s.CONSULTATION_FEE || 0, hospitalCharge: s.HOSPITAL_CHARGE || 500 });
+                                  setShowFeeModal(true);
+                                }
+                              }}>{s.ROLE === 'doctor' || (s.ROLE === undefined && s.SPECIALIST_AREA) ? 'Set Fee' : 'Edit'}</button>
+                              <button className={`action-link ${s.IS_ACTIVE === 1 ? 'deactivate' : 'activate'}`}>
+                                {s.IS_ACTIVE === 1 ? 'Deactivate' : 'Activate'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan="4" style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>No staff records found.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+
+                  <div className="table-footer">
+                    <span>Total {filteredStaff.length} staff members found</span>
+                  </div>
+                </div>
+
+              </div>
+            </>
           )}
         </main>
 
