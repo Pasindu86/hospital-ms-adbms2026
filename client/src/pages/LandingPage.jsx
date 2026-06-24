@@ -83,7 +83,9 @@ export default function LandingPage() {
     <div className="landing">
       <nav className="landing-nav">
         <div className="nav-brand">
-          <span className="brand-icon">+</span>
+          <span className="brand-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.503 4.045 3 5.5L12 21l7-7Z" /></svg>
+          </span>
           CarePulse Hospital
         </div>
         <div className="nav-links">
@@ -96,16 +98,24 @@ export default function LandingPage() {
       </nav>
 
       <section className="hero">
-        <div className="hero-content">
-          <h1>{info?.hospitalName || 'CarePulse Hospital'}</h1>
-          <p>{info?.tagline || 'Compassionate Care, Advanced Medicine'}</p>
-          <div className="hero-actions">
-            <button className="btn-hero-primary" onClick={() => navigate('/patient/register')}>
-              Book an Appointment
-            </button>
-            <button className="btn-hero-secondary" onClick={() => navigate('/login')}>
-              Login
-            </button>
+        <div className="hero-container">
+          <div className="hero-content">
+            <h1>{info?.hospitalName || 'CarePulse Hospital'}</h1>
+            <p>{info?.tagline || 'Compassionate Care, Advanced Medicine'}</p>
+            <div className="hero-search-bar">
+              <input type="text" placeholder="Search something here..." />
+              <button className="btn-search">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </button>
+            </div>
+            <div className="hero-actions">
+              <button className="btn-hero-primary" onClick={() => navigate('/login')}>
+                Sign In
+              </button>
+              <button className="btn-hero-secondary" onClick={() => navigate('/patient/register')}>
+                Sign Up
+              </button>
+            </div>
           </div>
         </div>
       </section>
